@@ -1,12 +1,13 @@
 import streamlit as st
 import google.generativeai as genai
 from pinecone import Pinecone
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
+# DİKKAT: Artık GoogleEmbeddings değil, HuggingFace kullanıyoruz
+from langchain_community.embeddings import HuggingFaceEmbeddings
 
 # --- SAYFA AYARLARI ---
 st.set_page_config(page_title="Regista Tactical Hub", page_icon="⚽", layout="wide")
 
-# --- CSS İLE GÖRSELLİK ---
+# --- CSS ---
 st.markdown("""
 <style>
     .main {background-color: #0e1117;}
@@ -15,133 +16,115 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- BAŞLIK ---
 st.title("⚽ Regista Tactical Hub")
 st.caption("AI Destekli Taktik Analiz & Arşiv Uzmanı")
 
 # --- API KURULUMLARI ---
-# Sadece Google ve Pinecone kontrolü yapıyoruz (Firebase YOK)
 if "GOOGLE_API_KEY" in st.secrets and "PINECONE_API_KEY" in st.secrets:
-    # 1. Google Gemini Kurulumu
+    # 1. Gemini (Sohbet için)
     genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
     
-    # 2. Pinecone Bağlantısı (Arşiv için)
+    # 2. Pinecone ve Embedding (Arşiv için)
     try:
         pc = Pinecone(api_key=st.secrets["PINECONE_API_KEY"])
         index_name = "regista-arsiv"
         pinecone_index = pc.Index(index_name)
         
-        # Embedding modeli
-        embeddings = GoogleGenerativeAIEmbeddings(
-            model="models/embedding-001", 
-            google_api_key=st.secrets["GOOGLE_API_KEY"]
-        )
-        db_status = "🟢 Arşiv Bağlı"
+        # KRİTİK NOKTA: Colab'deki motorun AYNISI olmak zorunda!
+        # model_name="sentence-transformers/all-MiniLM-L6-v2"
+        embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+        
+        db_status = "🟢 Arşiv Bağlı (HuggingFace Motoru)"
     except Exception as e:
         pinecone_index = None
         db_status = f"🔴 Arşiv Hatası: {e}"
-        # Hata olsa bile devam et, en azından sohbet çalışsın
-
 else:
-    st.error("🚨 HATA: API Anahtarları Eksik! Lütfen Streamlit Secrets ayarlarını kontrol et.")
-    st.info("Gerekli Anahtarlar: GOOGLE_API_KEY, PINECONE_API_KEY")
+    st.error("🚨 API Anahtarları Eksik!")
     st.stop()
 
 # --- YAN MENÜ ---
 with st.sidebar:
     st.header("Saha Kenarı")
-    st.info(f"Veritabanı Durumu: {db_status}")
+    st.info(f"Durum: {db_status}")
     st.markdown("---")
     st.markdown("**Nasıl Kullanılır?**")
     st.markdown("1. Sorunu yaz (Örn: 'Gegenpressing nedir?')")
-    st.markdown("2. AI hem bilgisiyle hem de **Bundesliga arşivinden** tarayarak cevaplar.")
+    st.markdown("2. Sistem arşivden tarayıp cevaplar.")
 
-# --- SOHBET GEÇMİŞİ ---
+# --- SOHBET ---
 if "messages" not in st.session_state:
-    st.session_state.messages = [
-        {"role": "assistant", "content": "Merhaba Hocam! Sahaya hoş geldin. Arşivdeki maç analizleri emrine amade. Ne analiz edelim?"}
-    ]
+    st.session_state.messages = [{"role": "assistant", "content": "Taktik tahtası hazır hocam. Hangi analize bakalım?"}]
 
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-# --- FONKSİYON: Arşivden Bilgi Çek (RAG) ---
+# --- ARŞİV ARAMA FONKSİYONU ---
 def arsivden_bul(soru):
     if not pinecone_index:
         return None, []
     
     try:
-        # 1. Soruyu vektöre çevir
+        # Soruyu vektöre çevir (HuggingFace ile)
         soru_vektor = embeddings.embed_query(soru)
         
-        # 2. Pinecone'da en benzer 3 dökümanı bul
+        # Pinecone'da ara
         sonuc = pinecone_index.query(
             vector=soru_vektor,
             top_k=3,
             include_metadata=True
         )
         
-        # 3. Metinleri birleştir
-        bulunan_bilgiler = ""
+        metinler = ""
         kaynaklar = []
         for match in sonuc['matches']:
             if 'text' in match['metadata']:
-                bulunan_bilgiler += match['metadata']['text'] + "\n\n"
-                # Kaynak ismini düzeltelim (source yoksa text'ten kırp)
-                src = match['metadata'].get('source', 'Bilinmeyen Dosya')
+                metinler += match['metadata']['text'] + "\n\n"
+                src = match['metadata'].get('source', 'Bilinmeyen')
                 kaynaklar.append(src)
         
-        return bulunan_bilgiler, list(set(kaynaklar))
+        return metinler, list(set(kaynaklar))
     except Exception as e:
-        print(f"Arama Hatası: {e}")
         return None, []
 
 # --- SOHBET MANTIĞI ---
-if prompt := st.chat_input("Taktiksel sorunu sor..."):
-    # Kullanıcı mesajını ekle
+if prompt := st.chat_input("Sorunu yaz..."):
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
 
-    # Asistan cevabı hazırlanıyor
     with st.chat_message("assistant"):
         message_placeholder = st.empty()
         message_placeholder.markdown("🔍 *Arşiv taranıyor...*")
         
-        # 1. Önce Arşivden Bilgi Getir
-        context_text, kaynaklar = arsivden_bul(prompt)
+        context, kaynaklar = arsivden_bul(prompt)
         
-        # 2. Gemini'ye Prompt Hazırla
-        base_prompt = """
-        Sen 'Regista AI' adında uzman bir futbol analistisin.
-        Sana kullanıcının özel arşivinden bulduğumuz metinler verildi.
+        prompt_taslagi = """
+        Sen uzman bir futbol analistisin. Aşağıdaki arşiv bilgilerini kullanarak soruyu yanıtla.
         
-        Kurallar:
-        1. Öncelikle 'BULUNAN ARŞİV BİLGİLERİ'ni kullan.
-        2. Arşivde bilgi yoksa, kendi bilgini kullan ama bunu belirt.
-        3. Profesyonel, taktiksel konuş.
+        KULLANICI SORUSU: {soru}
+        
+        ARŞİV BİLGİLERİ:
+        {bilgi}
+        
+        Eğer arşivde bilgi yoksa, genel futbol bilgini kullan ama bunu belirt.
         """
         
-        if context_text:
-            final_prompt = f"{base_prompt}\n\nKULLANICI SORUSU: {prompt}\n\nBULUNAN ARŞİV BİLGİLERİ:\n{context_text}"
+        if context:
+            final_prompt = prompt_taslagi.format(soru=prompt, bilgi=context)
         else:
-            final_prompt = f"{base_prompt}\n\nKULLANICI SORUSU: {prompt}\n\n(Arşivde bilgi bulunamadı, genel bilgi ver.)"
+            final_prompt = prompt_taslagi.format(soru=prompt, bilgi="(Arşivde bilgi bulunamadı)")
 
-        # 3. Modele Sor
         try:
-            # Model ismini değiştirebilirsin (gemini-2.0-flash-exp veya gemini-1.5-flash)
-            model = genai.GenerativeModel('gemini-2.5-flash') 
+            model = genai.GenerativeModel('gemini-pro')
             response = model.generate_content(final_prompt)
             ai_response = response.text
             
-            # Kaynakları ekle
             if kaynaklar:
-                kaynak_notu = "\n\n--- \n📚 **Kaynaklar:**\n" + "\n".join([f"- {k}" for k in kaynaklar])
-                ai_response += kaynak_notu
+                ai_response += "\n\n--- \n📚 **Kaynaklar:**\n" + "\n".join([f"- {k}" for k in kaynaklar])
             
             message_placeholder.markdown(ai_response)
             st.session_state.messages.append({"role": "assistant", "content": ai_response})
             
         except Exception as e:
-            st.error(f"Bir hata oluştu: {e}")
+            st.error(f"Hata: {e}")
