@@ -4,3 +4,7 @@ pinecone
 langchain
 langchain-community
 sentence-transformers
+langchain-huggingface
+plotly
+pandas
+numpy
