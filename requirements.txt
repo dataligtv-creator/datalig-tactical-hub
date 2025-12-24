@@ -2,5 +2,5 @@ streamlit
 google-generativeai
 pinecone
 langchain
-langchain-google-genai
 langchain-community
+sentence-transformers
