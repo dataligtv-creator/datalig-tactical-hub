@@ -1,10 +1,10 @@
 import streamlit as st
 import streamlit.components.v1 as components
 
-# --- SAYFA AYARLARI ---
+# --- 1. SAYFA AYARLARI ---
 st.set_page_config(page_title="Tactical Board | DATALIG", page_icon="📋", layout="wide")
 
-# --- 1. KOORDİNAT SİSTEMİ ---
+# --- 2. KOORDİNAT SİSTEMİ ---
 FORMATIONS = {
     "4-3-3": [
         {"l": "GK", "x": 5, "y": 50},
@@ -34,48 +34,101 @@ FORMATIONS = {
     ]
 }
 
-# --- 2. HTML ŞABLONU (F-STRING DEĞİL, DÜZ METİN) ---
-# Burada hiç süslü parantez karmaşası yok. Python burayı okumaz, sadece metin olarak görür.
-HTML_TEMPLATE = """
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600&display=swap" rel="stylesheet">
-    <script>
-        tailwind.config = {
-            theme: { extend: { colors: { primary: '#00e5ff', bgDark: '#0b0f19' }, fontFamily: { mono: ['JetBrains Mono', 'monospace'] } } }
-        }
-    </script>
-    <style>
-        body { background-color: transparent; color: white; margin: 0; padding: 0; overflow: hidden; }
-        .tactical-bg {
-            background-color: #0b0f19;
-            background-image: linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
-            background-size: 40px 40px;
-            width: 100%; height: 100%; position: absolute;
-        }
-        .player-dot {
-            width: 32px; height: 32px; background: #0b0f19; border: 2px solid #00e5ff; color: #00e5ff;
-            border-radius: 50%; display: flex; align-items: center; justify-content: center;
-            font-weight: bold; font-size: 10px; font-family: 'JetBrains Mono'; position: absolute;
-            box-shadow: 0 0 15px rgba(0, 229, 255, 0.3); cursor: grab; transition: all 0.5s ease-in-out;
-            z-index: 10; transform: translate(-50%, -50%);
-        }
-        .player-dot:hover { transform: translate(-50%, -50%) scale(1.1); background: #00e5ff; color: #0b0f19; z-index: 20; }
-        .ball { position: absolute; font-size: 18px; filter: drop-shadow(0 0 8px rgba(255,255,255,0.5)); animation: bounce 2s infinite; transform: translate(-50%, -50%); }
-        @keyframes bounce { 
-            0%, 100% { transform: translate(-50%, -50%) scale(1); } 
-            50% { transform: translate(-50%, -50%) scale(1.2); } 
-        }
-    </style>
-</head>
-<body>
-<div style="width: 100%; height: 600px; display: flex; align-items: center; justify-content: center;">
-    <div class="relative w-full aspect-[16/9] max-h-[550px] bg-slate-950 rounded-xl border border-white/10 overflow-hidden shadow-2xl">
-        <div class="tactical-bg"></div>
-        <div class="absolute inset-5 border border-white/20 rounded-sm opacity-80 pointer-events-none">
-            <div class="absolute left-1/2 top-0 bottom-0 w-px bg-white/20"></div>
-            <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 border border-white/20 rounded-full"></div>
-            <div class="absolute top-1/2 left-0 -translate-y-1/2 w-40 h-
+# --- 3. HTML PARÇALARI (Syntax Hatasını Önlemek İçin Bölüyoruz) ---
+
+# Parça 1: Stil (CSS)
+CSS_CODE = """
+<style>
+    body { background-color: transparent; color: white; margin: 0; overflow: hidden; font-family: sans-serif; }
+    .tactical-bg {
+        background-color: #0b0f19;
+        background-image: linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+        background-size: 40px 40px;
+        position: absolute; width: 100%; height: 100%;
+    }
+    .field-border {
+        position: absolute; top: 20px; bottom: 20px; left: 20px; right: 20px;
+        border: 2px solid rgba(255,255,255,0.2); border-radius: 4px; pointer-events: none;
+    }
+    .mid-line { position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: rgba(255,255,255,0.2); }
+    .center-circle {
+        position: absolute; top: 50%; left: 50%; width: 100px; height: 100px;
+        border: 2px solid rgba(255,255,255,0.2); border-radius: 50%; transform: translate(-50%, -50%);
+    }
+    .box-left { position: absolute; top: 50%; left: 0; width: 120px; height: 250px; border-right: 2px solid rgba(255,255,255,0.2); border-top: 2px solid rgba(255,255,255,0.2); border-bottom: 2px solid rgba(255,255,255,0.2); transform: translateY(-50%); }
+    .box-right { position: absolute; top: 50%; right: 0; width: 120px; height: 250px; border-left: 2px solid rgba(255,255,255,0.2); border-top: 2px solid rgba(255,255,255,0.2); border-bottom: 2px solid rgba(255,255,255,0.2); transform: translateY(-50%); }
+    
+    .player-dot {
+        width: 32px; height: 32px; background: #0b0f19; border: 2px solid #00e5ff; color: #00e5ff;
+        border-radius: 50%; display: flex; align-items: center; justify-content: center;
+        font-weight: bold; font-size: 11px; position: absolute;
+        box-shadow: 0 0 10px rgba(0, 229, 255, 0.3); z-index: 10;
+        transform: translate(-50%, -50%); transition: all 0.5s ease;
+    }
+    .ball { position: absolute; font-size: 20px; transform: translate(-50%, -50%); animation: bounce 2s infinite; }
+    @keyframes bounce { 0%, 100% { transform: translate(-50%, -50%) scale(1); } 50% { transform: translate(-50%, -50%) scale(1.2); } }
+</style>
+"""
+
+# Parça 2: Saha Çizgileri HTML'i
+FIELD_HTML = """
+<div class="tactical-bg"></div>
+<div class="field-border">
+    <div class="mid-line"></div>
+    <div class="center-circle"></div>
+    <div class="box-left"></div>
+    <div class="box-right"></div>
+</div>
+"""
+
+# --- 4. HTML BİRLEŞTİRİCİ FONKSİYON ---
+def get_final_html(formation_name):
+    # 1. Oyuncuları oluştur
+    players = FORMATIONS.get(formation_name, FORMATIONS["4-3-3"])
+    players_html = ""
+    for p in players:
+        # String birleştirme yapıyoruz (f-string yok, hata riski yok)
+        players_html += '<div class="player-dot" style="left: ' + str(p["x"]) + '%; top: ' + str(p["y"]) + '%;">' + p["l"] + '</div>'
+    
+    # 2. Hepsini birleştir
+    full_html = """
+    <!DOCTYPE html>
+    <html>
+    <head>""" + CSS_CODE + """</head>
+    <body>
+        <div style="position: relative; width: 100%; height: 600px; background: #0b0f19; border-radius: 12px; overflow: hidden; border: 1px solid #333;">
+            """ + FIELD_HTML + """
+            """ + players_html + """
+            <div class="ball" style="top: 55%; left: 55%;">⚽</div>
+            <div style="position: absolute; bottom: 10px; right: 10px; color: rgba(255,255,255,0.5); font-size: 12px; font-family: monospace;">
+                """ + formation_name + """ ACTIVE
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+    return full_html
+
+# --- 5. ARAYÜZ (GÖRÜNÜM) ---
+col_board, col_panel = st.columns([3, 1])
+
+with col_panel:
+    st.markdown("### ⚙️ TEKNİK HEYET")
+    # Seçimler
+    selected_formation = st.selectbox("Diziliş Seç", list(FORMATIONS.keys()))
+    style = st.selectbox("Mentalite", ["Possession", "Gegenpressing", "Counter"])
+    
+    st.markdown("---")
+    
+    # Bilgi Kartı (Python ile oluşturuyoruz, HTML karmaşası yok)
+    st.info(f"Aktif Sistem: {selected_formation}")
+    st.caption(f"Oyun Modu: {style}")
+
+    with st.expander("📝 Maç Notları"):
+        st.text_area("Notlar", "Bekleri ileri çıkar.", height=100)
+        st.button("Kaydet", use_container_width=True)
+
+with col_board:
+    # Fonksiyonu çağır ve çiz
+    code_to_render = get_final_html(selected_formation)
+    components.html(code_to_render, height=620, scrolling=False)
