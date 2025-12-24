@@ -1,0 +1,8 @@
+streamlit
+pandas
+numpy
+firebase-admin
+statsbombpy
+mplsoccer
+seaborn
+matplotlib
