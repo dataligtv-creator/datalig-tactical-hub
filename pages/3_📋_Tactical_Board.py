@@ -34,7 +34,7 @@ FORMATIONS = {
     ]
 }
 
-# --- 3. HTML PARÇALARI (CSS) ---
+# --- 3. HTML PARÇALARI ---
 CSS_CODE = """
 <style>
     body { background-color: transparent; color: white; margin: 0; overflow: hidden; font-family: sans-serif; }
@@ -51,34 +51,4 @@ CSS_CODE = """
     .mid-line { position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: rgba(255,255,255,0.2); }
     .center-circle {
         position: absolute; top: 50%; left: 50%; width: 100px; height: 100px;
-        border: 2px solid rgba(255,255,255,0.2); border-radius: 50%; transform: translate(-50%, -50%);
-    }
-    .box-left { position: absolute; top: 50%; left: 0; width: 120px; height: 250px; border-right: 2px solid rgba(255,255,255,0.2); border-top: 2px solid rgba(255,255,255,0.2); border-bottom: 2px solid rgba(255,255,255,0.2); transform: translateY(-50%); }
-    .box-right { position: absolute; top: 50%; right: 0; width: 120px; height: 250px; border-left: 2px solid rgba(255,255,255,0.2); border-top: 2px solid rgba(255,255,255,0.2); border-bottom: 2px solid rgba(255,255,255,0.2); transform: translateY(-50%); }
-    
-    .player-dot {
-        width: 32px; height: 32px; background: #0b0f19; border: 2px solid #00e5ff; color: #00e5ff;
-        border-radius: 50%; display: flex; align-items: center; justify-content: center;
-        font-weight: bold; font-size: 11px; position: absolute;
-        box-shadow: 0 0 10px rgba(0, 229, 255, 0.3); z-index: 10;
-        transform: translate(-50%, -50%); transition: all 0.5s ease; cursor: pointer;
-    }
-    .player-dot:hover { transform: translate(-50%, -50%) scale(1.2); background: #00e5ff; color: #000; z-index: 20; }
-    .ball { position: absolute; font-size: 20px; transform: translate(-50%, -50%); animation: bounce 2s infinite; }
-    @keyframes bounce { 0%, 100% { transform: translate(-50%, -50%) scale(1); } 50% { transform: translate(-50%, -50%) scale(1.2); } }
-</style>
-"""
-
-FIELD_HTML = """
-<div class="tactical-bg"></div>
-<div class="field-border">
-    <div class="mid-line"></div>
-    <div class="center-circle"></div>
-    <div class="box-left"></div>
-    <div class="box-right"></div>
-</div>
-"""
-
-# --- 4. HTML OLUŞTURUCU FONKSİYON ---
-def get_final_html(formation_name):
-    players = FORMATIONS.get(formation_name, FORMATIONS["4-3-
+        border:
