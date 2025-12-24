@@ -18,7 +18,7 @@ if 'authenticated' not in st.session_state:
 
 def check_login():
     # ŞİFRE BURADA: İstediğin şifreyi tırnak içine yaz
-    if st.session_state.password == "datalig2025":
+    if st.session_state.password == "169557894":
         st.session_state.authenticated = True
         st.rerun()
     else:
