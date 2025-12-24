@@ -6,7 +6,7 @@ st.set_page_config(page_title="Tactical Board | DATALIG", page_icon="📋", layo
 st.markdown("""
 <style>
     /* Yazı Tipleri */
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
+    @import url('[https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap](https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap)');
     
     :root { --primary: #00e5ff; --bg: #0b0f19; }
     
@@ -22,7 +22,7 @@ st.markdown("""
         border-radius: 12px;
         padding: 0;
         position: relative;
-        height: 600px; /* Sabit yükseklik verdik ki kaymasın */
+        height: 600px; /* Sabit yükseklik */
         width: 100%;
         max-width: 400px; /* Dikey saha genişliği */
         margin: 0 auto; /* Ortala */
@@ -165,4 +165,22 @@ with col_settings:
     
     with st.container():
         st.markdown("### 📝 Teknik Direktör Notları")
-        st.text_area("Maç Notları", "Rakip savunma arkasına atılan toplarda zayıf. Bekleri çok öne çıkıyor, kanat forvetleri (LW/RW) çizgiye
+        st.text_area("Maç Notları", "Rakip savunma arkasına atılan toplarda zayıf. Bekleri çok öne çıkıyor, kanat forvetleri (LW/RW) çizgiye basarak oynat.", height=150)
+        
+        col_b1, col_b2 = st.columns(2)
+        with col_b1:
+            st.button("💾 Taktikleri Kaydet", use_container_width=True)
+        with col_b2:
+            st.button("📤 PDF Olarak İndir", use_container_width=True)
+
+    # Mini Analiz Paneli
+    st.markdown("---")
+    st.markdown("""
+    <div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 8px;">
+        <h4 style="color: #00e5ff; margin: 0; font-size: 14px;">🤖 AI ASİSTAN ANALİZİ</h4>
+        <p style="color: #94a3b8; font-size: 12px; margin-top: 5px;">
+            "Hocam, 4-3-3 dizilişinde <b>LCM</b> ve <b>LW</b> arasındaki bağlantı kopuk görünüyor. 
+            Sol iç koridoru (Half-space) kullanmak için LCM'i biraz daha ileri itebiliriz."
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
