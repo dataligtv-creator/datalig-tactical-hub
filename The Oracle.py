@@ -17,16 +17,16 @@ if 'authenticated' not in st.session_state:
     st.session_state.authenticated = False
 
 def check_login():
-    # ŞİFRE BURADA: İstediğin şifreyi tırnak içine yaz
-    if st.session_state.password == "169557894":
+    # ŞİFRE KONTROLÜ
+    if st.session_state.password == "datalig2025":
         st.session_state.authenticated = True
-        st.rerun()
+        # BURADAKİ st.rerun() SİLİNDİ, ARTIK UYARI VERMEYECEK.
     else:
         st.session_state.login_error = "Hatalı şifre teknik direktörüm!"
 
 # --- EĞER GİRİŞ YAPILMADIYSA -> LOGIN EKRANI GÖSTER ---
 if not st.session_state.authenticated:
-    # Login CSS Tasarımı (Senin login.html dosyandan uyarlandı)
+    # Login CSS Tasarımı
     st.markdown("""
     <style>
         .stApp {
@@ -57,7 +57,6 @@ if not st.session_state.authenticated:
             font-size: 14px;
             margin-bottom: 30px;
         }
-        /* Input Alanlarını Özelleştirme */
         .stTextInput input {
             background-color: #0f172a !important;
             border: 1px solid rgba(255, 255, 255, 0.1) !important;
@@ -69,7 +68,6 @@ if not st.session_state.authenticated:
             border-color: #00e5ff !important;
             box-shadow: 0 0 10px rgba(0, 229, 255, 0.2) !important;
         }
-        /* Buton Özelleştirme */
         .stButton button {
             width: 100%;
             background-color: #00e5ff !important;
@@ -86,8 +84,7 @@ if not st.session_state.authenticated:
     </style>
     """, unsafe_allow_html=True)
 
-    # Login Formu
-    col1, col2, col3 = st.columns([1, 1, 1]) # Ortalamak için
+    col1, col2, col3 = st.columns([1, 1, 1])
     with col2:
         st.markdown("""
         <div class="login-container">
@@ -97,17 +94,18 @@ if not st.session_state.authenticated:
         </div>
         """, unsafe_allow_html=True)
         
+        # Callback kullanımı (Enter'a basınca veya butona tıklayınca check_login çalışır)
         st.text_input("Şifre", type="password", key="password", placeholder="Access Key...", on_change=check_login)
         st.button("Sisteme Giriş Yap", on_click=check_login)
         
         if 'login_error' in st.session_state:
             st.error(st.session_state.login_error)
             
-    st.stop() # Giriş yapılmadıysa aşağıdaki kodları çalıştırma
+    st.stop() 
 
-# --- 🚀 BURADAN SONRASI ANA UYGULAMA (GİRİŞ BAŞARILIYSA ÇALIŞIR) ---
+# --- 🚀 ANA UYGULAMA ---
 
-# --- 🎨 DATALIG TASARIM SİSTEMİ (CSS) ---
+# --- 🎨 CSS ---
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
@@ -128,7 +126,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- BAŞLIK VE LOGO ---
+# --- BAŞLIK ---
 col1, col2 = st.columns([1, 12])
 with col1:
     st.markdown("""
@@ -145,7 +143,7 @@ with col2:
     """, unsafe_allow_html=True)
 st.markdown("---")
 
-# --- API KURULUMLARI ---
+# --- API ---
 if "GOOGLE_API_KEY" in st.secrets and "PINECONE_API_KEY" in st.secrets:
     genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
     try:
@@ -163,7 +161,7 @@ else:
     st.error("🚨 API KEY EKSİK!")
     st.stop()
 
-# --- YAN MENÜ ---
+# --- SIDEBAR ---
 with st.sidebar:
     st.markdown(f"""
     <div style="padding: 10px; background: rgba(0, 229, 255, 0.05); border: 1px solid rgba(0, 229, 255, 0.1); border-radius: 8px; margin-bottom: 20px;">
@@ -178,12 +176,11 @@ with st.sidebar:
     st.info("Model: **Gemini 2.5 Flash**")
     st.info("Motor: **HuggingFace**")
     
-    # ÇIKIŞ BUTONU
     if st.button("🔒 Çıkış Yap"):
         st.session_state.authenticated = False
         st.rerun()
 
-# --- SOHBET ---
+# --- CHAT ---
 if "messages" not in st.session_state:
     st.session_state.messages = [{"role": "assistant", "content": "Sistem hazır hocam. Veri akışı başladı."}]
 
