@@ -40,35 +40,38 @@ FORMATIONS = {
     ]
 }
 
-# --- 2. HTML OLUŞTURUCU ---
+# --- 2. CSS STİL KODLARI (AYRI BİR DEĞİŞKEN OLARAK) ---
+# Hata riskini önlemek için CSS'i düz string yapıyoruz (f-string değil)
+board_css = """
+<style>
+    body { background-color: transparent; color: white; overflow: hidden; }
+    
+    .tactical-bg {
+        background-color: #0b0f19;
+        background-image: linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+        background-size: 40px 40px;
+    }
+    
+    .player-dot {
+        width: 32px; height: 32px; background: #0b0f19; border: 2px solid #00e5ff; color: #00e5ff;
+        border-radius: 50%; display: flex; align-items: center; justify-content: center;
+        font-weight: bold; font-size: 10px; font-family: 'JetBrains Mono'; position: absolute;
+        box-shadow: 0 0 15px rgba(0, 229, 255, 0.3); cursor: grab; transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+        z-index: 10; transform: translate(-50%, -50%);
+    }
+    
+    .player-dot:hover { transform: translate(-50%, -50%) scale(1.1); background: #00e5ff; color: #0b0f19; z-index: 20; }
+    
+    .ball { position: absolute; font-size: 18px; filter: drop-shadow(0 0 8px rgba(255,255,255,0.5)); animation: bounce 2s infinite; transform: translate(-50%, -50%); }
+    
+    @keyframes bounce { 
+        0%, 100% { transform: translate(-50%, -50%) scale(1); } 
+        50% { transform: translate(-50%, -50%) scale(1.2); } 
+    }
+</style>
+"""
+
+# --- 3. HTML OLUŞTURUCU ---
 def generate_board_html(formation_name):
     players = FORMATIONS.get(formation_name, FORMATIONS["4-3-3"])
-    players_html = ""
-    for p in players:
-        players_html += f'<div class="player-dot" style="left: {p["x"]}%; top: {p["y"]}%;">{p["l"]}</div>\n'
-
-    html_code = f"""
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <script src="https://cdn.tailwindcss.com"></script>
-        <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600&display=swap" rel="stylesheet">
-        <script>
-            tailwind.config = {{
-                theme: {{ extend: {{ colors: {{ primary: '#00e5ff', bgDark: '#0b0f19' }}, fontFamily: {{ mono: ['JetBrains Mono', 'monospace'] }} }} }}
-            }}
-        </script>
-        <style>
-            body {{ background-color: transparent; color: white; overflow: hidden; }}
-            .tactical-bg {{
-                background-color: #0b0f19;
-                background-image: linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
-                background-size: 40px 40px;
-            }}
-            .player-dot {{
-                width: 32px; height: 32px; background: #0b0f19; border: 2px solid #00e5ff; color: #00e5ff;
-                border-radius: 50%; display: flex; align-items: center; justify-content: center;
-                font-weight: bold; font-size: 10px; font-family: 'JetBrains Mono'; position: absolute;
-                box-shadow: 0 0 15px rgba(0, 229, 255, 0.3); cursor: grab; transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-                z-index: 10; transform: translate(-50%, -50%);
+    players_html =
