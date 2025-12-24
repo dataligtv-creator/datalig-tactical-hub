@@ -56,4 +56,19 @@ def generate_board_html(formation_name):
         <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600&display=swap" rel="stylesheet">
         <script>
             tailwind.config = {{
-                theme: {{ extend: {{ colors: {{ primary: '#
+                theme: {{ extend: {{ colors: {{ primary: '#00e5ff', bgDark: '#0b0f19' }}, fontFamily: {{ mono: ['JetBrains Mono', 'monospace'] }} }} }}
+            }}
+        </script>
+        <style>
+            body {{ background-color: transparent; color: white; overflow: hidden; }}
+            .tactical-bg {{
+                background-color: #0b0f19;
+                background-image: linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+                background-size: 40px 40px;
+            }}
+            .player-dot {{
+                width: 32px; height: 32px; background: #0b0f19; border: 2px solid #00e5ff; color: #00e5ff;
+                border-radius: 50%; display: flex; align-items: center; justify-content: center;
+                font-weight: bold; font-size: 10px; font-family: 'JetBrains Mono'; position: absolute;
+                box-shadow: 0 0 15px rgba(0, 229, 255, 0.3); cursor: grab; transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+                z-index: 10; transform: translate(-50%, -50%);
