@@ -1,8 +1,7 @@
 streamlit
-pandas
-numpy
-firebase-admin
-statsbombpy
-mplsoccer
-seaborn
 matplotlib
+seaborn
+mplsoccer
+firebase-admin
+pandas
+google-generativeai
