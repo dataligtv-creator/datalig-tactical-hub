@@ -34,9 +34,7 @@ FORMATIONS = {
     ]
 }
 
-# --- 3. HTML PARÇALARI (Syntax Hatasını Önlemek İçin Bölüyoruz) ---
-
-# Parça 1: Stil (CSS)
+# --- 3. HTML PARÇALARI (CSS) ---
 CSS_CODE = """
 <style>
     body { background-color: transparent; color: white; margin: 0; overflow: hidden; font-family: sans-serif; }
@@ -63,14 +61,14 @@ CSS_CODE = """
         border-radius: 50%; display: flex; align-items: center; justify-content: center;
         font-weight: bold; font-size: 11px; position: absolute;
         box-shadow: 0 0 10px rgba(0, 229, 255, 0.3); z-index: 10;
-        transform: translate(-50%, -50%); transition: all 0.5s ease;
+        transform: translate(-50%, -50%); transition: all 0.5s ease; cursor: pointer;
     }
+    .player-dot:hover { transform: translate(-50%, -50%) scale(1.2); background: #00e5ff; color: #000; z-index: 20; }
     .ball { position: absolute; font-size: 20px; transform: translate(-50%, -50%); animation: bounce 2s infinite; }
     @keyframes bounce { 0%, 100% { transform: translate(-50%, -50%) scale(1); } 50% { transform: translate(-50%, -50%) scale(1.2); } }
 </style>
 """
 
-# Parça 2: Saha Çizgileri HTML'i
 FIELD_HTML = """
 <div class="tactical-bg"></div>
 <div class="field-border">
@@ -81,54 +79,6 @@ FIELD_HTML = """
 </div>
 """
 
-# --- 4. HTML BİRLEŞTİRİCİ FONKSİYON ---
+# --- 4. HTML OLUŞTURUCU FONKSİYON ---
 def get_final_html(formation_name):
-    # 1. Oyuncuları oluştur
-    players = FORMATIONS.get(formation_name, FORMATIONS["4-3-3"])
-    players_html = ""
-    for p in players:
-        # String birleştirme yapıyoruz (f-string yok, hata riski yok)
-        players_html += '<div class="player-dot" style="left: ' + str(p["x"]) + '%; top: ' + str(p["y"]) + '%;">' + p["l"] + '</div>'
-    
-    # 2. Hepsini birleştir
-    full_html = """
-    <!DOCTYPE html>
-    <html>
-    <head>""" + CSS_CODE + """</head>
-    <body>
-        <div style="position: relative; width: 100%; height: 600px; background: #0b0f19; border-radius: 12px; overflow: hidden; border: 1px solid #333;">
-            """ + FIELD_HTML + """
-            """ + players_html + """
-            <div class="ball" style="top: 55%; left: 55%;">⚽</div>
-            <div style="position: absolute; bottom: 10px; right: 10px; color: rgba(255,255,255,0.5); font-size: 12px; font-family: monospace;">
-                """ + formation_name + """ ACTIVE
-            </div>
-        </div>
-    </body>
-    </html>
-    """
-    return full_html
-
-# --- 5. ARAYÜZ (GÖRÜNÜM) ---
-col_board, col_panel = st.columns([3, 1])
-
-with col_panel:
-    st.markdown("### ⚙️ TEKNİK HEYET")
-    # Seçimler
-    selected_formation = st.selectbox("Diziliş Seç", list(FORMATIONS.keys()))
-    style = st.selectbox("Mentalite", ["Possession", "Gegenpressing", "Counter"])
-    
-    st.markdown("---")
-    
-    # Bilgi Kartı (Python ile oluşturuyoruz, HTML karmaşası yok)
-    st.info(f"Aktif Sistem: {selected_formation}")
-    st.caption(f"Oyun Modu: {style}")
-
-    with st.expander("📝 Maç Notları"):
-        st.text_area("Notlar", "Bekleri ileri çıkar.", height=100)
-        st.button("Kaydet", use_container_width=True)
-
-with col_board:
-    # Fonksiyonu çağır ve çiz
-    code_to_render = get_final_html(selected_formation)
-    components.html(code_to_render, height=620, scrolling=False)
+    players = FORMATIONS.get(formation_name, FORMATIONS["4-3-
