@@ -1,12 +1,14 @@
 import streamlit as st
 
+# --- SAYFA AYARLARI ---
 st.set_page_config(page_title="Tactical Board | DATALIG", page_icon="📋", layout="wide")
 
-# --- CSS (TASARIM) ---
+# --- CSS (TASARIM KODLARI) ---
+# Bu kısım HTML öğelerinin nasıl görüneceğini belirler (Renkler, konumlar vb.)
 st.markdown("""
 <style>
     /* Yazı Tipleri */
-    @import url('[https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap](https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap)');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
     
     :root { --primary: #00e5ff; --bg: #0b0f19; }
     
@@ -24,7 +26,7 @@ st.markdown("""
         position: relative;
         height: 600px; /* Sabit yükseklik */
         width: 100%;
-        max-width: 400px; /* Dikey saha genişliği */
+        max-width: 450px; /* Dikey saha genişliği */
         margin: 0 auto; /* Ortala */
         background-image: 
             linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px),
@@ -129,6 +131,7 @@ with col_board:
     st.markdown('<h3 style="text-align: center; color: white;">📋 TAKTİK TAHTASI</h3>', unsafe_allow_html=True)
     
     # HTML SAHA SİMÜLASYONU
+    # Buradaki st.markdown wrapper'ı Python'ın HTML kodunu hata vermeden okumasını sağlar.
     st.markdown("""
     <div class="tactic-board">
         <div class="midfield-line"></div>
