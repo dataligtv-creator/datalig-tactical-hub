@@ -131,7 +131,7 @@ if prompt := st.chat_input("Taktiksel sorunu sor..."):
         # 3. Modele Sor
         try:
             # Model ismini değiştirebilirsin (gemini-2.0-flash-exp veya gemini-1.5-flash)
-            model = genai.GenerativeModel('gemini-1.5-flash') 
+            model = genai.GenerativeModel('gemini-2.5-flash') 
             response = model.generate_content(final_prompt)
             ai_response = response.text
             
