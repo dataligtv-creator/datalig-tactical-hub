@@ -39,7 +39,7 @@ db = get_db()
 if "GOOGLE_API_KEY" in st.secrets:
     genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
     # Yapay Zeka Kişiliği: Futbol Analisti
-    model = genai.GenerativeModel('gemini-pro', 
+    model = genai.GenerativeModel('gemini-1.5-flash', 
         system_instruction="Sen 'Regista AI' adında, Klopp ve Guardiola karışımı zeki bir futbol analistisin. Kullanıcının sorularına taktiksel, veri odaklı ve kısa cevaplar ver. Asla futbol dışı konulara girme.")
 else:
     st.warning("⚠️ Yapay Zeka için API Key girilmemiş.")
