@@ -1,161 +1,147 @@
 import streamlit as st
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
-import seaborn as sns
-from mplsoccer import Pitch
-import firebase_admin
-from firebase_admin import credentials, firestore
-import pandas as pd
-import json
-import google.generativeai as genai  # <--- YENİ EKLENDİ
+import google.generativeai as genai
+from pinecone import Pinecone
+from langchain_google_genai import GoogleGenerativeAIEmbeddings
 
-st.set_page_config(page_title="Regista Hub", layout="wide")
+# --- SAYFA AYARLARI ---
+st.set_page_config(page_title="Regista Tactical Hub", page_icon="⚽", layout="wide")
+
+# --- CSS İLE GÖRSELLİK ---
+st.markdown("""
+<style>
+    .main {background-color: #0e1117;}
+    h1 {color: #ff4b4b;}
+    .stChatMessage {border-radius: 10px;}
+</style>
+""", unsafe_allow_html=True)
+
+# --- BAŞLIK ---
 st.title("⚽ Regista Tactical Hub")
+st.caption("AI Destekli Taktik Analiz & Arşiv Uzmanı")
 
-# --- 1. BAĞLANTI & AYARLAR ---
-@st.cache_resource
-def get_db():
-    if not firebase_admin._apps:
-        if "FIREBASE_KEY" in st.secrets:
-            try:
-                key_content = st.secrets["FIREBASE_KEY"]
-                if key_content.startswith("'") and key_content.endswith("'"):
-                     key_content = key_content[1:-1]
-                key_dict = json.loads(key_content)
-                cred = credentials.Certificate(key_dict)
-                firebase_admin.initialize_app(cred)
-            except Exception as e:
-                st.error(f"❌ Firebase Hatası: {e}")
-                st.stop()
-        else:
-            st.error("🚨 HATA: Firebase anahtarı yok.")
-            st.stop()
-    return firestore.client()
-
-db = get_db()
-
-# --- GEMINI AI AYARLARI (YENİ) ---
-if "GOOGLE_API_KEY" in st.secrets:
+# --- API KURULUMLARI ---
+# Sadece Google ve Pinecone kontrolü yapıyoruz (Firebase YOK)
+if "GOOGLE_API_KEY" in st.secrets and "PINECONE_API_KEY" in st.secrets:
+    # 1. Google Gemini Kurulumu
     genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
-    # Yapay Zeka Kişiliği: Futbol Analisti
-    model = genai.GenerativeModel('gemini-2.5-flash', 
-        system_instruction="Sen 'Regista AI' adında, Klopp ve Guardiola karışımı zeki bir futbol analistisin. Kullanıcının sorularına taktiksel, veri odaklı ve kısa cevaplar ver. Asla futbol dışı konulara girme.")
+    
+    # 2. Pinecone Bağlantısı (Arşiv için)
+    try:
+        pc = Pinecone(api_key=st.secrets["PINECONE_API_KEY"])
+        index_name = "regista-arsiv"
+        pinecone_index = pc.Index(index_name)
+        
+        # Embedding modeli
+        embeddings = GoogleGenerativeAIEmbeddings(
+            model="models/embedding-001", 
+            google_api_key=st.secrets["GOOGLE_API_KEY"]
+        )
+        db_status = "🟢 Arşiv Bağlı"
+    except Exception as e:
+        pinecone_index = None
+        db_status = f"🔴 Arşiv Hatası: {e}"
+        # Hata olsa bile devam et, en azından sohbet çalışsın
+
 else:
-    st.warning("⚠️ Yapay Zeka için API Key girilmemiş.")
+    st.error("🚨 HATA: API Anahtarları Eksik! Lütfen Streamlit Secrets ayarlarını kontrol et.")
+    st.info("Gerekli Anahtarlar: GOOGLE_API_KEY, PINECONE_API_KEY")
+    st.stop()
 
-# --- KENAR ÇUBUĞU ---
-st.sidebar.header("⚙️ Analiz Ayarları")
-selected_team = st.sidebar.selectbox("Takım Seçiniz", ["Argentina", "France"])
-match_id = 3869685
+# --- YAN MENÜ ---
+with st.sidebar:
+    st.header("Saha Kenarı")
+    st.info(f"Veritabanı Durumu: {db_status}")
+    st.markdown("---")
+    st.markdown("**Nasıl Kullanılır?**")
+    st.markdown("1. Sorunu yaz (Örn: 'Gegenpressing nedir?')")
+    st.markdown("2. AI hem bilgisiyle hem de **Bundesliga arşivinden** tarayarak cevaplar.")
 
-try:
-    players_ref = db.collection("players").where("team", "==", selected_team).stream()
-    player_list = sorted([doc.to_dict()["name"] for doc in players_ref])
-except:
-    player_list = []
-filter_options = ["Tüm Takım"] + player_list
+# --- SOHBET GEÇMİŞİ ---
+if "messages" not in st.session_state:
+    st.session_state.messages = [
+        {"role": "assistant", "content": "Merhaba Hocam! Sahaya hoş geldin. Arşivdeki maç analizleri emrine amade. Ne analiz edelim?"}
+    ]
 
-st.sidebar.markdown("---")
-st.sidebar.subheader("🔍 Oyuncu Filtresi")
-selected_player = st.sidebar.selectbox("Oyuncu Seçiniz", filter_options)
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
 
-# --- SEKMELER (TAB) - ARTIK 5 TANE ---
-tab1, tab2, tab3, tab4, tab5 = st.tabs(["📋 Kadro", "🕸️ Pas Ağı", "🔥 Isı Haritası", "🥅 Şut Haritası", "💬 AI Analist"])
-
-# ... (TAB 1, 2, 3, 4 KODLARI AYNEN KALIYOR - KISALTTIM YER KAPLAMASIN) ...
-with tab1:
-    st.subheader(f"{selected_team} Kadrosu")
+# --- FONKSİYON: Arşivden Bilgi Çek (RAG) ---
+def arsivden_bul(soru):
+    if not pinecone_index:
+        return None, []
+    
     try:
-        players_ref = db.collection("players").where("team", "==", selected_team).stream()
-        data = [doc.to_dict() for doc in players_ref]
-        if data: st.dataframe(pd.DataFrame(data)[["name", "number", "position"]], use_container_width=True)
-    except: st.warning("Veri yok.")
+        # 1. Soruyu vektöre çevir
+        soru_vektor = embeddings.embed_query(soru)
+        
+        # 2. Pinecone'da en benzer 3 dökümanı bul
+        sonuc = pinecone_index.query(
+            vector=soru_vektor,
+            top_k=3,
+            include_metadata=True
+        )
+        
+        # 3. Metinleri birleştir
+        bulunan_bilgiler = ""
+        kaynaklar = []
+        for match in sonuc['matches']:
+            if 'text' in match['metadata']:
+                bulunan_bilgiler += match['metadata']['text'] + "\n\n"
+                # Kaynak ismini düzeltelim (source yoksa text'ten kırp)
+                src = match['metadata'].get('source', 'Bilinmeyen Dosya')
+                kaynaklar.append(src)
+        
+        return bulunan_bilgiler, list(set(kaynaklar))
+    except Exception as e:
+        print(f"Arama Hatası: {e}")
+        return None, []
 
-with tab2:
-    st.subheader(f"🔗 {selected_team} Pas Trafiği")
-    try:
-        doc = db.collection("analytics").document(f"pass_network_{selected_team}_{match_id}").get()
-        if doc.exists:
-            data = doc.to_dict()
-            pitch = Pitch(pitch_type='statsbomb', pitch_color='#22312b', line_color='#c7d5cc')
-            fig, ax = pitch.draw(figsize=(16, 11))
-            fig.set_facecolor("#22312b")
-            links, locations = data.get("links", {}), data.get("locations", {})
-            for key, count in links.items():
-                if count > 2:
-                    p, r = key.split(" -> ")
-                    if p in locations and r in locations:
-                        pitch.arrows(locations[p][0], locations[p][1], locations[r][0], locations[r][1], width=count/5, color="white", alpha=0.5, ax=ax)
-            for n, l in locations.items():
-                pitch.scatter(l[0], l[1], s=300, color='#1ea8bd', edgecolors='white', ax=ax)
-                pitch.annotate(n, (l[0], l[1]-3), ax=ax, color='white', ha='center', fontsize=9)
-            st.pyplot(fig)
-    except: st.error("Hata.")
+# --- SOHBET MANTIĞI ---
+if prompt := st.chat_input("Taktiksel sorunu sor..."):
+    # Kullanıcı mesajını ekle
+    st.session_state.messages.append({"role": "user", "content": prompt})
+    with st.chat_message("user"):
+        st.markdown(prompt)
 
-with tab3:
-    st.subheader(f"🔥 {selected_team} Isı Haritası")
-    try:
-        doc = db.collection("analytics").document(f"heatmap_{selected_team}_{match_id}").get()
-        if doc.exists:
-            df = pd.DataFrame(doc.to_dict().get("events", []))
-            if selected_player != "Tüm Takım": df = df[df["player"] == selected_player]
-            if not df.empty:
-                pitch = Pitch(pitch_type='statsbomb', pitch_color='#22312b', line_color='#efefef')
-                fig, ax = pitch.draw(figsize=(16, 11))
-                fig.set_facecolor('#22312b')
-                sns.kdeplot(x=df['x'], y=df['y'], fill=True, thresh=0.05, alpha=0.8, n_levels=100, cmap='magma', ax=ax)
-                st.pyplot(fig)
-    except: st.error("Hata.")
+    # Asistan cevabı hazırlanıyor
+    with st.chat_message("assistant"):
+        message_placeholder = st.empty()
+        message_placeholder.markdown("🔍 *Arşiv taranıyor...*")
+        
+        # 1. Önce Arşivden Bilgi Getir
+        context_text, kaynaklar = arsivden_bul(prompt)
+        
+        # 2. Gemini'ye Prompt Hazırla
+        base_prompt = """
+        Sen 'Regista AI' adında uzman bir futbol analistisin.
+        Sana kullanıcının özel arşivinden bulduğumuz metinler verildi.
+        
+        Kurallar:
+        1. Öncelikle 'BULUNAN ARŞİV BİLGİLERİ'ni kullan.
+        2. Arşivde bilgi yoksa, kendi bilgini kullan ama bunu belirt.
+        3. Profesyonel, taktiksel konuş.
+        """
+        
+        if context_text:
+            final_prompt = f"{base_prompt}\n\nKULLANICI SORUSU: {prompt}\n\nBULUNAN ARŞİV BİLGİLERİ:\n{context_text}"
+        else:
+            final_prompt = f"{base_prompt}\n\nKULLANICI SORUSU: {prompt}\n\n(Arşivde bilgi bulunamadı, genel bilgi ver.)"
 
-with tab4:
-    st.subheader(f"🥅 {selected_team} Şut Analizi & xG")
-    try:
-        doc = db.collection("analytics").document(f"shots_{selected_team}_{match_id}").get()
-        if doc.exists:
-            df_shots = pd.DataFrame(doc.to_dict().get("shots", []))
-            if selected_player != "Tüm Takım": df_shots = df_shots[df_shots["player"] == selected_player]
-            if not df_shots.empty:
-                pitch = Pitch(pitch_type='statsbomb', pitch_color='#22312b', line_color='#c7d5cc')
-                fig, ax = pitch.draw(figsize=(16, 11))
-                fig.set_facecolor("#22312b")
-                goals = df_shots[df_shots["outcome"] == "Goal"]
-                non_goals = df_shots[df_shots["outcome"] != "Goal"]
-                pitch.scatter(non_goals.x, non_goals.y, s=non_goals.xg * 700 + 100, edgecolors='#ff4b4b', c='None', hatch='///', marker='o', ax=ax, alpha=0.8, label="Kaçan")
-                pitch.scatter(goals.x, goals.y, s=goals.xg * 700 + 100, edgecolors='white', c='#00ff00', marker='*', ax=ax, alpha=1, label="GOL")
-                st.pyplot(fig)
-                st.dataframe(df_shots[["player", "outcome", "xg"]], use_container_width=True)
-    except: st.error("Hata.")
-
-# --- 5. SEKME: AI ANALİST (YENİ! 🤖) ---
-with tab5:
-    st.subheader("🤖 Regista AI: Taktik Asistanı")
-    st.caption("Veri odaklı sorular sorabilirsin. Örn: 'Pas bağlantıları nasıl kurulmalı?'")
-
-    # Sohbet Geçmişini Başlat
-    if "messages" not in st.session_state:
-        st.session_state.messages = []
-
-    # Eski mesajları ekrana bas
-    for message in st.session_state.messages:
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
-
-    # Kullanıcıdan Girdi Al
-    if prompt := st.chat_input("Taktik sorunu buraya yaz..."):
-        # 1. Kullanıcı mesajını göster
-        st.session_state.messages.append({"role": "user", "content": prompt})
-        with st.chat_message("user"):
-            st.markdown(prompt)
-
-        # 2. AI Cevabını Üret
-        with st.chat_message("assistant"):
-            if "GOOGLE_API_KEY" in st.secrets:
-                try:
-                    response = model.generate_content(prompt)
-                    st.markdown(response.text)
-                    st.session_state.messages.append({"role": "assistant", "content": response.text})
-                except Exception as e:
-                    st.error(f"Hata oluştu: {e}")
-            else:
-                st.warning("Lütfen Streamlit Secrets kısmına GOOGLE_API_KEY ekleyin.")
+        # 3. Modele Sor
+        try:
+            # Model ismini değiştirebilirsin (gemini-2.0-flash-exp veya gemini-1.5-flash)
+            model = genai.GenerativeModel('gemini-1.5-flash') 
+            response = model.generate_content(final_prompt)
+            ai_response = response.text
+            
+            # Kaynakları ekle
+            if kaynaklar:
+                kaynak_notu = "\n\n--- \n📚 **Kaynaklar:**\n" + "\n".join([f"- {k}" for k in kaynaklar])
+                ai_response += kaynak_notu
+            
+            message_placeholder.markdown(ai_response)
+            st.session_state.messages.append({"role": "assistant", "content": ai_response})
+            
+        except Exception as e:
+            st.error(f"Bir hata oluştu: {e}")
