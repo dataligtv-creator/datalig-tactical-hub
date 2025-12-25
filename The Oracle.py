@@ -81,9 +81,10 @@ st.markdown("---")
 if "GOOGLE_API_KEY" in st.secrets and "PINECONE_API_KEY" in st.secrets:
     genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
     
-    # MODELİ ÖNBELLEĞE AL (HATA 429 ÇÖZÜMÜ)
+    # --- MODEL GÜNCELLEMESİ YAPILDI (HATA ÇÖZÜMÜ) ---
     @st.cache_resource
     def get_model():
+        # 'gemini-1.5-flash-latest' kullanıyoruz. Eğer bu da hata verirse 'gemini-pro' yapacağız.
         return genai.GenerativeModel('gemini-1.5-flash-latest')
     
     model = get_model()
@@ -103,9 +104,8 @@ else:
     st.error("🚨 API KEY EKSİK! Lütfen Secrets ayarlarını kontrol et.")
     st.stop()
 
-# --- SIDEBAR (HATALI KISIM DÜZELTİLDİ) ---
+# --- SIDEBAR ---
 with st.sidebar:
-    # f-string içindeki HTML'i düzgünce hizaladık
     sidebar_html = f"""
     <div style="padding: 10px; background: rgba(0, 229, 255, 0.05); border: 1px solid rgba(0, 229, 255, 0.1); border-radius: 8px; margin-bottom: 20px;">
         <div style="font-family: 'JetBrains Mono'; font-size: 12px; color: #94a3b8;">SYSTEM STATUS</div>
