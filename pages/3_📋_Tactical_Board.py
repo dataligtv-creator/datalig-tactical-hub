@@ -4,8 +4,7 @@ import streamlit.components.v1 as components
 # --- 1. SAYFA AYARLARI ---
 st.set_page_config(page_title="Tactical Board | DATALIG", page_icon="📋", layout="wide")
 
-# --- 2. KOORDİNAT SİSTEMİ (Yatay Saha) ---
-# x:0 (Sol Kale), x:100 (Sağ Kale)
+# --- 2. KOORDİNAT SİSTEMİ ---
 FORMATIONS = {
     "4-3-3": [
         {"l": "GK", "x": 5, "y": 50},
@@ -35,196 +34,189 @@ FORMATIONS = {
     ]
 }
 
-# --- 3. GÖRSEL TASARIM (CSS) - AYRI TUTULDU ---
-STYLE_CSS = """
+# --- 3. CSS (PRO TASARIM) ---
+# Buradaki CSS kodları sahaya "Derinlik" ve "Neon" havası katar.
+CSS_STYLE = """
 <style>
-    /* GENEL AYARLAR */
-    body { margin: 0; padding: 0; background: transparent; overflow: hidden; font-family: 'Courier New', monospace; }
-    
-    /* SAHA ZEMİNİ (NEON GRID) */
-    .field-container {
+    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@800&display=swap');
+
+    body { margin: 0; padding: 0; background: transparent; overflow: hidden; font-family: 'JetBrains Mono', monospace; }
+
+    /* SAHA KUTUSU */
+    .field-wrapper {
         width: 100%; height: 600px;
-        background-color: #0b0f19;
-        background-image: 
-            linear-gradient(rgba(0, 229, 255, 0.05) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(0, 229, 255, 0.05) 1px, transparent 1px);
-        background-size: 40px 40px;
+        display: flex; justify-content: center; align-items: center;
+        background: transparent;
+    }
+
+    .tactical-field {
         position: relative;
-        border-radius: 12px;
-        box-shadow: 0 0 30px rgba(0,0,0,0.5);
-        border: 1px solid #333;
+        width: 95%; height: 550px;
+        background-color: #0f172a;
+        /* Modern Grid Dokusu */
+        background-image: 
+            linear-gradient(rgba(0, 229, 255, 0.03) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(0, 229, 255, 0.03) 1px, transparent 1px);
+        background-size: 50px 50px;
+        border: 2px solid rgba(255, 255, 255, 0.1);
+        border-radius: 8px;
+        box-shadow: 0 0 50px rgba(0, 0, 0, 0.8);
     }
 
-    /* SAHA ÇİZGİLERİ */
-    .field-lines {
-        position: absolute; top: 20px; bottom: 20px; left: 40px; right: 40px;
-        border: 2px solid rgba(255,255,255,0.4);
-        box-shadow: 0 0 10px rgba(255,255,255,0.1);
+    /* ÇİZGİLER ORTAK AYAR */
+    .line { position: absolute; border: 2px solid rgba(255, 255, 255, 0.3); box-sizing: border-box; }
+    
+    /* DIŞ ÇİZGİLER (TAÇ) */
+    .touch-line { top: 20px; bottom: 20px; left: 40px; right: 40px; border: 2px solid rgba(255, 255, 255, 0.5); }
+    
+    /* ORTA SAHA */
+    .mid-line { top: 20px; bottom: 20px; left: 50%; width: 0; border-left: 2px solid rgba(255, 255, 255, 0.3); }
+    .center-circle { 
+        top: 50%; left: 50%; width: 100px; height: 100px; 
+        border-radius: 50%; transform: translate(-50%, -50%); 
+        border: 2px solid rgba(255, 255, 255, 0.5);
     }
-    
-    .mid-line { position: absolute; left: 50%; top: 0; bottom: 0; width: 2px; background: rgba(255,255,255,0.4); }
-    
-    .center-circle {
-        position: absolute; top: 50%; left: 50%; width: 120px; height: 120px;
-        border: 2px solid rgba(255,255,255,0.4); border-radius: 50%;
-        transform: translate(-50%, -50%);
-    }
-    
     .center-spot {
-        position: absolute; top: 50%; left: 50%; width: 6px; height: 6px;
+        top: 50%; left: 50%; width: 6px; height: 6px; 
         background: white; border-radius: 50%; transform: translate(-50%, -50%);
+        box-shadow: 0 0 10px white;
     }
 
-    /* SOL KALE BÖLGESİ */
-    .penalty-area-left {
-        position: absolute; top: 50%; left: 0; width: 15%; height: 60%;
-        border-right: 2px solid rgba(255,255,255,0.4);
-        border-top: 2px solid rgba(255,255,255,0.4);
-        border-bottom: 2px solid rgba(255,255,255,0.4);
-        transform: translateY(-50%);
-        background: rgba(255,255,255,0.02);
+    /* SOL KALE ALANI */
+    .penalty-box-left { top: 50%; left: 40px; width: 130px; height: 260px; transform: translateY(-50%); border-left: none; background: rgba(255,255,255,0.02); }
+    .six-yard-left { top: 50%; left: 40px; width: 50px; height: 100px; transform: translateY(-50%); border-left: none; }
+    .penalty-arc-left { 
+        top: 50%; left: 170px; width: 50px; height: 80px; 
+        border-radius: 0 50% 50% 0; border-left: none; transform: translateY(-50%);
     }
-    .six-yard-left {
-        position: absolute; top: 50%; left: 0; width: 5%; height: 30%;
-        border-right: 2px solid rgba(255,255,255,0.4);
-        border-top: 2px solid rgba(255,255,255,0.4);
-        border-bottom: 2px solid rgba(255,255,255,0.4);
+    .penalty-spot-left { top: 50%; left: 140px; width: 4px; height: 4px; background: white; border-radius: 50%; transform: translateY(-50%); }
+
+    /* GERÇEK SOL KALE DİREĞİ (DIŞARI TAŞAN) */
+    .goal-left {
+        position: absolute; top: 50%; left: 25px; width: 15px; height: 60px;
+        border: 3px solid #00e5ff; border-right: none; 
         transform: translateY(-50%);
-    }
-    .goal-post-left {
-        position: absolute; top: 50%; left: -10px; width: 10px; height: 14%;
-        border: 2px solid rgba(0, 229, 255, 0.8); border-right: none;
-        transform: translateY(-50%);
-        box-shadow: -5px 0 10px rgba(0, 229, 255, 0.4);
+        box-shadow: -5px 0 15px rgba(0, 229, 255, 0.5);
+        border-radius: 4px 0 0 4px;
     }
 
-    /* SAĞ KALE BÖLGESİ */
-    .penalty-area-right {
-        position: absolute; top: 50%; right: 0; width: 15%; height: 60%;
-        border-left: 2px solid rgba(255,255,255,0.4);
-        border-top: 2px solid rgba(255,255,255,0.4);
-        border-bottom: 2px solid rgba(255,255,255,0.4);
-        transform: translateY(-50%);
-        background: rgba(255,255,255,0.02);
+    /* SAĞ KALE ALANI */
+    .penalty-box-right { top: 50%; right: 40px; width: 130px; height: 260px; transform: translateY(-50%); border-right: none; background: rgba(255,255,255,0.02); }
+    .six-yard-right { top: 50%; right: 40px; width: 50px; height: 100px; transform: translateY(-50%); border-right: none; }
+    .penalty-arc-right { 
+        top: 50%; right: 170px; width: 50px; height: 80px; 
+        border-radius: 50% 0 0 50%; border-right: none; transform: translateY(-50%);
     }
-    .six-yard-right {
-        position: absolute; top: 50%; right: 0; width: 5%; height: 30%;
-        border-left: 2px solid rgba(255,255,255,0.4);
-        border-top: 2px solid rgba(255,255,255,0.4);
-        border-bottom: 2px solid rgba(255,255,255,0.4);
+    .penalty-spot-right { top: 50%; right: 140px; width: 4px; height: 4px; background: white; border-radius: 50%; transform: translateY(-50%); }
+
+    /* GERÇEK SAĞ KALE DİREĞİ (DIŞARI TAŞAN) */
+    .goal-right {
+        position: absolute; top: 50%; right: 25px; width: 15px; height: 60px;
+        border: 3px solid #00e5ff; border-left: none; 
         transform: translateY(-50%);
-    }
-    .goal-post-right {
-        position: absolute; top: 50%; right: -10px; width: 10px; height: 14%;
-        border: 2px solid rgba(0, 229, 255, 0.8); border-left: none;
-        transform: translateY(-50%);
-        box-shadow: 5px 0 10px rgba(0, 229, 255, 0.4);
+        box-shadow: 5px 0 15px rgba(0, 229, 255, 0.5);
+        border-radius: 0 4px 4px 0;
     }
 
-    /* OYUNCULAR */
-    .player-dot {
-        width: 36px; height: 36px;
-        background: #0b0f19;
-        border: 2px solid #00e5ff;
-        color: #00e5ff;
-        border-radius: 50%;
-        display: flex; align-items: center; justify-content: center;
-        font-weight: 800; font-size: 11px;
+    /* KÖŞE YAYLARI (CORNER ARCS) */
+    .corner-tl { top: 20px; left: 40px; width: 20px; height: 20px; border-radius: 0 0 100% 0; border-top: none; border-left: none; }
+    .corner-tr { top: 20px; right: 40px; width: 20px; height: 20px; border-radius: 0 0 0 100%; border-top: none; border-right: none; }
+    .corner-bl { bottom: 20px; left: 40px; width: 20px; height: 20px; border-radius: 0 100% 0 0; border-bottom: none; border-left: none; }
+    .corner-br { bottom: 20px; right: 40px; width: 20px; height: 20px; border-radius: 100% 0 0 0; border-bottom: none; border-right: none; }
+
+    /* OYUNCU STİLİ (PARLAYAN) */
+    .player {
         position: absolute;
-        box-shadow: 0 0 15px rgba(0, 229, 255, 0.4);
-        z-index: 20;
+        width: 34px; height: 34px;
+        background: #0b0f19;
+        color: #00e5ff;
+        border: 2px solid #00e5ff;
+        border-radius: 50%;
+        display: flex; justify-content: center; align-items: center;
+        font-size: 10px; font-weight: bold;
         transform: translate(-50%, -50%);
-        transition: all 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275); /* Yaylanma Efekti */
-        cursor: pointer;
+        box-shadow: 0 0 15px rgba(0, 229, 255, 0.4);
+        z-index: 10;
+        transition: all 0.6s cubic-bezier(0.34, 1.56, 0.64, 1); /* Havalı geçiş animasyonu */
+        cursor: grab;
     }
-    .player-dot:hover {
-        transform: translate(-50%, -50%) scale(1.3);
-        background: #00e5ff; color: #000;
-        z-index: 30;
+    .player:hover {
+        transform: translate(-50%, -50%) scale(1.2);
+        background: #00e5ff; color: #0b0f19;
+        z-index: 20;
+        box-shadow: 0 0 25px rgba(0, 229, 255, 0.8);
     }
 
-    /* TOP VE BİLGİ */
-    .ball { position: absolute; font-size: 24px; top: 50%; left: 50%; transform: translate(-50%, -50%); animation: bounce 2s infinite; }
+    .ball { position: absolute; font-size: 20px; transform: translate(-50%, -50%); animation: bounce 2s infinite; z-index: 5; }
     @keyframes bounce { 0%, 100% { transform: translate(-50%, -50%) scale(1); } 50% { transform: translate(-50%, -50%) scale(1.2); } }
 
-    .info-tag {
-        position: absolute; bottom: 15px; right: 20px;
-        font-size: 10px; color: rgba(0, 229, 255, 0.6);
-        letter-spacing: 2px;
-    }
 </style>
 """
 
-# --- 4. HTML OLUŞTURUCU (MODÜLER YAPI) ---
-def create_tactical_board(formation_name):
-    # Oyuncuları Hazırla
+# --- 4. HTML OLUŞTURUCU (MODÜLER) ---
+def render_field(formation_name):
     players = FORMATIONS.get(formation_name, FORMATIONS["4-3-3"])
+    
+    # Oyuncu HTML'ini oluştur
     players_html = ""
     for p in players:
-        # String birleştirme (Hatasız yöntem)
-        players_html += '<div class="player-dot" style="left: ' + str(p["x"]) + '%; top: ' + str(p["y"]) + '%;">' + p["l"] + '</div>'
+        # Oyuncu koordinatlarını ekle
+        players_html += '<div class="player" style="left: ' + str(p["x"]) + '%; top: ' + str(p["y"]) + '%;">' + p["l"] + '</div>'
 
-    # Nihai HTML Kodu (Tek Parça)
-    final_html = """
+    # SAHA İSKELETİ
+    html_content = """
     <!DOCTYPE html>
     <html>
-    <head>""" + STYLE_CSS + """</head>
+    <head>""" + CSS_STYLE + """</head>
     <body>
-        <div class="field-container">
-            <div class="field-lines">
-                <div class="mid-line"></div>
-                <div class="center-circle"></div>
+        <div class="field-wrapper">
+            <div class="tactical-field">
+                <div class="line touch-line"></div>
+                <div class="line mid-line"></div>
+                <div class="line center-circle"></div>
                 <div class="center-spot"></div>
-                
-                <div class="penalty-area-left"></div>
-                <div class="six-yard-left"></div>
-                <div class="goal-post-left"></div> <div class="penalty-area-right"></div>
-                <div class="six-yard-right"></div>
-                <div class="goal-post-right"></div> </div>
 
-            """ + players_html + """
-            
-            <div class="ball">⚽</div>
-            
-            <div class="info-tag">""" + formation_name + """ ACTIVE</div>
+                <div class="line penalty-box-left"></div>
+                <div class="line six-yard-left"></div>
+                <div class="line penalty-arc-left"></div>
+                <div class="penalty-spot-left"></div>
+                <div class="goal-left"></div> <div class="line penalty-box-right"></div>
+                <div class="line six-yard-right"></div>
+                <div class="line penalty-arc-right"></div>
+                <div class="penalty-spot-right"></div>
+                <div class="goal-right"></div> <div class="line corner-tl"></div>
+                <div class="line corner-tr"></div>
+                <div class="line corner-bl"></div>
+                <div class="line corner-br"></div>
+
+                """ + players_html + """
+                <div class="ball" style="top: 50%; left: 50%;">⚽</div>
+            </div>
         </div>
     </body>
     </html>
     """
-    return final_html
+    return html_content
 
-# --- 5. ARAYÜZ (LAYOUT) ---
+# --- 5. ARAYÜZ ---
 col_board, col_panel = st.columns([3, 1])
 
 with col_panel:
-    st.markdown("### ⚙️ SAHA KENARI")
+    st.markdown("### 🛠️ TAKTİK MERKEZİ")
     
-    # Seçimler
-    selected_formation = st.selectbox("Diziliş", list(FORMATIONS.keys()))
-    game_style = st.selectbox("Oyun Stili", ["Possession Game", "Gegenpressing", "Low Block Counter", "Wing Play"])
+    formation = st.selectbox("Formasyon", list(FORMATIONS.keys()))
+    tactic = st.selectbox("Oyun Stili", ["Possession (Topa Sahip Olma)", "Gegenpressing", "Counter Attack", "Low Block"])
     
-    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown("---")
     
-    # NEON BİLGİ KARTI (Streamlit Native - Hatasız)
-    st.markdown(f"""
-    <div style="
-        background: rgba(30, 41, 59, 0.6); 
-        border-left: 4px solid #00e5ff; 
-        padding: 20px; 
-        border-radius: 0 12px 12px 0;
-        margin-bottom: 20px;
-    ">
-        <div style="color: #94a3b8; font-size: 10px; margin-bottom: 5px; letter-spacing: 1px;">AKTİF SİSTEM</div>
-        <div style="color: white; font-size: 28px; font-weight: 900;">{selected_formation}</div>
-        <div style="color: #00e5ff; font-size: 12px; margin-top: 5px;">★ {game_style}</div>
-    </div>
-    """, unsafe_allow_html=True)
+    # BİLGİ KARTI (Streamlit Metrikleri ile - Temiz ve Şık)
+    st.metric(label="SEÇİLEN SİSTEM", value=formation, delta=tactic.split(" ")[0])
     
-    with st.expander("📋 Teknik Notlar", expanded=True):
-        st.text_area("Analiz", "Rakip savunma arkasına atılan toplarda zayıf.", height=100)
-        if st.button("💾 Kaydet", use_container_width=True):
-            st.toast("Taktik varyasyonu veritabanına işlendi!", icon="✅")
+    with st.expander("📝 Teknik Direktör Notu", expanded=True):
+        st.text_area("Notlar", "Rakip savunma arkasına sarku koşularını artır.", height=100)
+        if st.button("💾 Varyasyonu Kaydet", use_container_width=True):
+            st.toast("Taktik başarıyla kaydedildi.", icon="✅")
 
 with col_board:
-    # Render (Kaydırma çubuğu kapalı)
-    components.html(create_tactical_board(selected_formation), height=620, scrolling=False)
+    # Sahayı Çiz
+    components.html(render_field(formation), height=620, scrolling=False)
