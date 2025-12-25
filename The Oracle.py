@@ -84,7 +84,7 @@ if "GOOGLE_API_KEY" in st.secrets and "PINECONE_API_KEY" in st.secrets:
     # MODELİ ÖNBELLEĞE AL (HATA 429 ÇÖZÜMÜ)
     @st.cache_resource
     def get_model():
-        return genai.GenerativeModel('gemini-1.5-flash')
+        return genai.GenerativeModel('gemini-1.5-flash-latest')
     
     model = get_model()
 
