@@ -74,14 +74,17 @@ baker = PyPizza(
     other_circle_ls="-."
 )
 
-# Çizim (Hatasız Basit Versiyon)
+# Çizim
 try:
     fig, ax = baker.make_pizza(
         p1_val,                     # Oyuncu 1 Listesi
         compare_values=p2_val,      # Oyuncu 2 Listesi
         figsize=(10, 10),
         
-        # Renk Ayarları (Parametre çakışmasını önlemek için sadeleştirildi)
+        # --- DÜZELTME YAPILAN YER ---
+        # 'color_blank_roots' parametresi SİLİNDİ.
+        
+        # Renk Ayarları
         kwargs_slices=dict(facecolor="#00e5ff", edgecolor="#0b0f19", zorder=2, linewidth=1, alpha=0.8),
         kwargs_compare=dict(facecolor="#ff0055", edgecolor="#0b0f19", zorder=2, linewidth=1, alpha=0.8),
         
