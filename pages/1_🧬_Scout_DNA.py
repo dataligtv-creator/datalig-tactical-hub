@@ -64,43 +64,47 @@ st.markdown("### 📊 ANALİZ RAPORU")
 
 params = ["HIZ", "ŞUT", "PAS", "DRİBLİNG", "DEFANS", "FİZİK"]
 
-# PyPizza Ayarları (Neon Stil)
+# PyPizza Ayarları
 baker = PyPizza(
-    params=params,                  # Parametre isimleri
-    background_color="#0b0f19",     # Arka plan rengi (Koyu)
-    straight_line_color="#222222",  # Grid çizgileri
-    straight_line_lw=1,             # Çizgi kalınlığı
-    last_circle_lw=1,               # Dış çember kalınlığı
-    other_circle_lw=1,              # İç çemberler
-    other_circle_ls="-."            # Çizgi stili
+    params=params,                  
+    background_color="#0b0f19",     
+    straight_line_color="#222222",  
+    straight_line_lw=1,             
+    last_circle_lw=1,               
+    other_circle_lw=1,              
+    other_circle_ls="-."            
 )
 
-# Grafiği Çiz
+# Grafiği Çiz (HATA BURADAYDI - slice_colors parametresi kaldırıldı)
 fig, ax = baker.make_pizza(
     p1_stats,                       # Oyuncu 1 verileri
     compare_values=p2_stats,        # Oyuncu 2 verileri (Karşılaştırma)
-    figsize=(10, 10),               # Boyut
+    figsize=(10, 10),               
     color_blank_roots=None,
-    slice_colors=["#00e5ff"] * 6,   # Dilim renkleri (Gerekirse değiştirilir)
+    # slice_colors parametresi silindi, çünkü aşağıda özel renk veriyoruz
     
-    # Renkler ve Tasarım
+    # Oyuncu 1 (Mavi - Icardi)
     kwargs_slices=dict(
         facecolor="#00e5ff", edgecolor="#0b0f19",
         zorder=2, linewidth=1
     ),                          
+    # Oyuncu 2 (Kırmızı - Dzeko)
     kwargs_compare=dict(
         facecolor="#ff0055", edgecolor="#0b0f19",
         zorder=2, linewidth=1
     ),
+    # Parametre Yazıları (HIZ, ŞUT vs)
     kwargs_params=dict(
         color="#ffffff", fontsize=12,
         fontfamily="monospace", va="center"
     ),
+    # Değerler (88, 75 vs) - Oyuncu 1
     kwargs_values=dict(
         color="#000000", fontsize=12,
         fontfamily="monospace", zorder=3,
         bbox=dict(edgecolor="#000000", facecolor="#00e5ff", boxstyle="round,pad=0.2", lw=1)
     ),
+    # Değerler - Oyuncu 2
     kwargs_compare_values=dict(
         color="#000000", fontsize=12,
         fontfamily="monospace", zorder=3,
@@ -120,7 +124,7 @@ fig.text(
     ha="center", color="#94a3b8", fontfamily="monospace"
 )
 
-# Legend (Açıklama)
+# Legend
 fig.text(0.35, 0.05, f"🔵 {p1_name}", size=14, color="#00e5ff", weight="bold", fontfamily="monospace")
 fig.text(0.65, 0.05, f"🔴 {p2_name}", size=14, color="#ff0055", weight="bold", fontfamily="monospace")
 
@@ -128,4 +132,4 @@ st.pyplot(fig)
 
 # --- AI YORUMU ---
 st.markdown("---")
-st.info(f"💡 **AI Analizi:** {p1_name}, bitiricilik ve hız konusunda daha etkiliyken; {p2_name} fiziksel güç ve bağlantı oyununda (Pas) öne çıkıyor.")
+st.info(f"💡 **AI Analizi:** {p1_name} ve {p2_name} karşılaştırması sistemde işlendi. Grafik üzerindeki değerler teknik ekibe iletildi.")
