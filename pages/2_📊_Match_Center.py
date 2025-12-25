@@ -1,9 +1,3 @@
-# Scout DNA sayfasında seçim yapınca:
-st.session_state['secilen_oyuncu'] = p1_name
-
-# Match Center sayfasında okurken:
-if 'secilen_oyuncu' in st.session_state:
-    varsayilan_oyuncu = st.session_state['secilen_oyuncu']
 import streamlit as st
 import pandas as pd
 import numpy as np
