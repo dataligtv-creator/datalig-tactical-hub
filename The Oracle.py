@@ -81,11 +81,11 @@ st.markdown("---")
 if "GOOGLE_API_KEY" in st.secrets and "PINECONE_API_KEY" in st.secrets:
     genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
     
-    # --- MODEL GÜNCELLEMESİ YAPILDI (HATA ÇÖZÜMÜ) ---
+    # --- MODEL GÜNCELLEMESİ (SENİN EKRANINDAKİ VERSİYON) ---
     @st.cache_resource
     def get_model():
-        # 'gemini-1.5-flash-latest' kullanıyoruz. Eğer bu da hata verirse 'gemini-pro' yapacağız.
-        return genai.GenerativeModel('gemini-1.5-flash-latest')
+        # Hocam ekranında '2.5 Flash' varsa kod karşılığı budur:
+        return genai.GenerativeModel('gemini-2.5-flash')
     
     model = get_model()
 
@@ -118,7 +118,8 @@ with st.sidebar:
     st.markdown(sidebar_html, unsafe_allow_html=True)
     
     st.markdown("### 🛠️ KONTROL PANELİ")
-    st.info("Model: **Gemini 1.5 Flash**")
+    # Bilgi ekranını da düzelttik
+    st.info("Model: **Gemini 2.5 Flash**")
     st.info("Motor: **HuggingFace**")
     
     if st.button("🔒 Çıkış Yap"):
