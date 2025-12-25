@@ -6,17 +6,18 @@ import matplotlib.pyplot as plt
 # --- SAYFA AYARLARI ---
 st.set_page_config(page_title="War Room | DATALIG", page_icon="📋", layout="wide")
 
-# --- CSS ---
+# --- CSS (KURUMSAL VE SADE) ---
 st.markdown("""
 <style>
     .stApp { background-color: #0b0f19; }
     h1, h2, h3 { color: white !important; font-family: 'monospace'; }
-    .stButton button { background-color: #00e5ff !important; color: #0b0f19 !important; font-weight: bold; }
+    .stButton button { background-color: #00e5ff !important; color: #0b0f19 !important; font-weight: bold; border-radius: 5px; }
+    .report-box { background-color: rgba(30, 41, 59, 0.4); padding: 20px; border-left: 4px solid #ff0055; border-radius: 8px; margin-top: 20px; }
 </style>
 """, unsafe_allow_html=True)
 
 st.title("📋 THE WAR ROOM")
-st.caption("Otomatik Taktiksel Planlama & Rakip Panzehiri")
+st.caption("Savunma Kurgusu ve Stratejik Planlama")
 st.markdown("---")
 
 # --- HAFIZA KONTROLÜ ---
@@ -26,18 +27,17 @@ aktif_oyuncu = st.session_state.get('aktif_oyuncu', "Genel Rakip")
 col_sidebar, col_pitch = st.columns([1, 2])
 
 with col_sidebar:
-    st.markdown(f"### 🛡️ RAKİP ANALİZİ: <span style='color:#ff0055;'>{aktif_oyuncu}</span>", unsafe_allow_html=True)
-    st.info(f"Sistem, {aktif_oyuncu} üzerine bir savunma planı hazırlıyor.")
+    st.markdown(f"### 🛡️ HEDEF ANALİZİ: <span style='color:#ff0055;'>{aktif_oyuncu}</span>", unsafe_allow_html=True)
     
-    st.markdown("### ⚙️ DİZİLİŞ SEÇİMİ")
-    formation = st.selectbox("Kendi Dizilişimiz", ["4-3-3", "4-2-3-1", "3-5-2", "4-4-2"])
+    st.markdown("### ⚙️ SAVUNMA KURGUSU")
+    formation = st.selectbox("Dizilişimiz", ["4-3-3", "4-2-3-1", "3-5-2", "4-4-2"])
     
-    st.markdown("### 🏹 HÜCUM STRATEJİSİ")
-    focus_zone = st.radio("Odak Bölgesi", ["Kanat Organizasyonu", "Merkez Delici Paslar", "Bek Arkası Koşular"])
+    st.markdown("### 🏹 ÖNLEMLER")
+    defense_style = st.radio("Savunma Tipi", ["Adam Adama Markaj", "Alan Savunması", "Yüksek Prese Dayalı"])
     
-    if st.button("Taktiği Sahaya Uygula"):
-        st.balloons()
-        st.success("Taktiksel plan senkronize edildi.")
+    if st.button("Taktiği Onayla"):
+        # Balonlar uçuruldu! Artık sadece ciddi bir onay mesajı var.
+        st.success("Taktiksel plan savaş odasına gönderildi.")
 
 # --- SAHA ÇİZİMİ ---
 with col_pitch:
@@ -45,33 +45,47 @@ with col_pitch:
     fig, ax = pitch.draw(figsize=(8, 11))
     fig.set_facecolor('#0b0f19')
 
-    # Dizilişlere Göre Oyuncu Pozisyonları (Örnek: 4-3-3)
-    if formation == "4-3-3":
+    # Dizilişlere Göre Oyuncu Pozisyonları
+    if formation == "4-2-3-1":
         # Defans
         pitch.scatter(15, 40, s=400, color='#0b0f19', edgecolor='#00e5ff', linewidth=2, ax=ax) # GK
-        pitch.scatter(35, 15, s=400, color='#00e5ff', ax=ax); pitch.scatter(35, 65, s=400, color='#00e5ff', ax=ax) # Bekler
-        pitch.scatter(30, 30, s=400, color='#00e5ff', ax=ax); pitch.scatter(30, 50, s=400, color='#00e5ff', ax=ax) # Stoperler
-        # Orta Saha
-        pitch.scatter(55, 40, s=400, color='#00e5ff', ax=ax) # CDM
-        pitch.scatter(65, 25, s=400, color='#00e5ff', ax=ax); pitch.scatter(65, 55, s=400, color='#00e5ff', ax=ax) # CMler
+        pitch.scatter(30, 15, s=400, color='#00e5ff', ax=ax); pitch.scatter(30, 65, s=400, color='#00e5ff', ax=ax) # Bekler
+        pitch.scatter(25, 32, s=400, color='#00e5ff', ax=ax); pitch.scatter(25, 48, s=400, color='#00e5ff', ax=ax) # Stoperler
+        # Ön Libero
+        pitch.scatter(45, 30, s=400, color='#00e5ff', ax=ax); pitch.scatter(45, 50, s=400, color='#00e5ff', ax=ax)
+        # Ofansif Hat
+        pitch.scatter(75, 40, s=400, color='#00e5ff', ax=ax) # CAM
+        pitch.scatter(85, 15, s=400, color='#00e5ff', ax=ax); pitch.scatter(85, 65, s=400, color='#00e5ff', ax=ax) # Kanatlar
         # Forvet
-        pitch.scatter(95, 15, s=400, color='#00e5ff', ax=ax); pitch.scatter(95, 65, s=400, color='#00e5ff', ax=ax) # Kanatlar
         pitch.scatter(105, 40, s=400, color='#00e5ff', ax=ax) # ST
 
-    # Dinamik Oklar (Stratejiye Göre)
-    if focus_zone == "Kanat Organizasyonu":
-        pitch.arrows(35, 15, 80, 10, width=2, color='#00e5ff', alpha=0.6, ax=ax) # Sol bek bindirme
-        pitch.arrows(35, 65, 80, 70, width=2, color='#00e5ff', alpha=0.6, ax=ax) # Sağ bek bindirme
-    elif focus_zone == "Merkez Delici Paslar":
-        pitch.arrows(65, 40, 95, 40, width=3, color='#f59e0b', ax=ax) # Merkez dikine pas
-    
-    # Rakip Odak Noktası (Scout DNA'dan gelen oyuncu nerede durabilir?)
-    pitch.scatter(85, 40, s=500, color='none', edgecolor='#ff0055', linewidth=3, linestyle='--', ax=ax)
-    ax.text(40, 85, f"HEDEF: {aktif_oyuncu}", color='#ff0055', fontsize=12, ha='center', fontweight='bold')
+    # Rakip Odak Noktası (Kırmızı Halka)
+    pitch.scatter(85, 40, s=600, color='none', edgecolor='#ff0055', linewidth=3, linestyle='--', ax=ax)
+    ax.text(40, 85, f"TEHLİKE: {aktif_oyuncu}", color='#ff0055', fontsize=12, ha='center', fontweight='bold')
 
     st.pyplot(fig)
 
-# --- AI TAKTİKSEL ANALİZ NOTU ---
+# --- ALT ANALİZ: GOL VE SAVUNMA ANALİZİ ---
 st.markdown("---")
-with st.expander("🤖 AI TAKTİKSEL TAVSİYESİ (ÖZEL)"):
-    st.write(f"Hocam, {aktif_oyuncu} genellikle defansif geçişlerde ağır kalıyor. Seçtiğiniz {formation} dizilişiyle {focus_zone} üzerinden yapacağımız baskı, rakibin dengesini bozacaktır. Özellikle 2. bölgedeki pres yoğunluğunu %15 artırmanızı öneririm.")
+st.markdown(f"### 📋 {aktif_oyuncu} | Kritik Savunma Raporu")
+
+# Bu kısım normalde Oracle'dan dinamik gelebilir, şimdilik akıllı bir mantık kuruyoruz:
+col_info1, col_info2 = st.columns(2)
+
+with col_info1:
+    st.markdown('<div class="report-box">', unsafe_allow_html=True)
+    st.markdown("#### ⚽ Gol Analizi")
+    if "Icardi" in aktif_oyuncu:
+        st.write("Oyuncu ceza sahası içinde 'tek dokunuş' gollerinde uzman. Genellikle arka direk koşuları ve kaleciden dönen topları takip ediyor.")
+    elif "Rafa" in aktif_oyuncu:
+        st.write("Merkezden driplingle girip uzak köşeye plase bırakmayı seviyor. Kontrataklarda en tehlikeli silah.")
+    else:
+        st.write("Oyuncu son vuruşlarda soğukkanlı. Özellikle kanat ortalarında markajdan kurtulma becerisi çok yüksek.")
+    st.markdown('</div>', unsafe_allow_html=True)
+
+with col_info2:
+    st.markdown('<div class="report-box" style="border-left-color: #00e5ff;">', unsafe_allow_html=True)
+    st.markdown("#### 🛡️ Savunma Panzehiri")
+    st.write(f"Hocam, {aktif_oyuncu} için seçtiğiniz **{defense_style}** kurgusu doğru.")
+    st.write("Tavsiyem: Rakibin pas kanallarını kapatmak için ön liberolardan birini 'gölge markaj' görevine çekin. Rakip arkaya koşu attığında ofsayt tuzağı yerine derin savunmayı tercih edin.")
+    st.markdown('</div>', unsafe_allow_html=True)
