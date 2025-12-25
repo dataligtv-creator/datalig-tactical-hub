@@ -87,4 +87,85 @@ with st.sidebar:
         <div style="font-family: 'monospace'; font-size: 12px; color: #94a3b8;">SYSTEM STATUS</div>
         <div style="display: flex; align-items: center; gap: 8px; margin-top: 5px;">
             <div style="width: 8px; height: 8px; background-color: {db_color}; border-radius: 50%; box-shadow: 0 0 10px {db_color};"></div>
-            <div style="
+            <div style="font-weight: bold; color: white;">{db_status}</div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # 🧠 AKTİF ÖĞRENME MODÜLÜ
+    st.markdown("### 🧠 SİSTEMİ EĞİT")
+    yeni_bilgi = st.text_area("Öğretilecek Bilgi:", placeholder="Örn: Takımımız 70. dakikadan sonra fiziksel olarak düşüyor.")
+    kaynak_etiketi = st.text_input("Referans:", value="TD Notu")
+    
+    if st.button("💾 Hafızaya Kaydet"):
+        if yeni_bilgi and pinecone_index:
+            with st.spinner("Öğreniliyor..."):
+                vektor = embeddings.embed_query(yeni_bilgi)
+                vector_id = str(uuid.uuid4())
+                pinecone_index.upsert(vectors=[{"id": vector_id, "values": vektor, "metadata": {"text": yeni_bilgi, "source": kaynak_etiketi}}])
+                st.success("Sistem bu bilgiyi öğrendi!")
+                time.sleep(1)
+                st.rerun()
+
+    if st.button("🔒 Çıkış Yap"):
+        st.session_state.authenticated = False
+        st.rerun()
+
+# --- HEADER ---
+st.markdown("### ⚽ DATALIG <span style='font-weight:300; color:#94a3b8;'>ORACLE V2.5</span>", unsafe_allow_html=True)
+st.markdown("---")
+
+# --- CHAT LOGIC ---
+if "messages" not in st.session_state:
+    st.session_state.messages = [{"role": "assistant", "content": "Sistem hazır hocam. Hangi oyuncu veya taktik üzerinde çalışıyoruz?"}]
+
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"], unsafe_allow_html=True)
+
+# --- SORU-CEVAP MEKANİZMASI ---
+if prompt := st.chat_input("Taktiksel analiz sorgusu..."):
+    st.session_state.messages.append({"role": "user", "content": prompt})
+    with st.chat_message("user"):
+        st.markdown(prompt)
+
+    with st.chat_message("assistant"):
+        msg_placeholder = st.empty()
+        
+        # 1. HAFIZADAKİ OYUNCUYU ÇEK (Scout DNA'dan gelen)
+        secili_oyuncu = st.session_state.get('aktif_oyuncu', "Genel Kadro")
+        
+        with st.status(f"⚡ {secili_oyuncu} ANALİZ EDİLİYOR...", expanded=False) as status:
+            # Pinecone Arama
+            soru_vektor = embeddings.embed_query(prompt)
+            search_results = pinecone_index.query(vector=soru_vektor, top_k=3, include_metadata=True)
+            context = "\n".join([res['metadata']['text'] for res in search_results['matches']])
+            kaynaklar = list(set([res['metadata'].get('source', 'Arşiv') for res in search_results['matches']]))
+            status.update(label="ANALİZ TAMAMLANDI", state="complete")
+
+        # 2. PROMPT OLUŞTURMA
+        prompt_taslagi = f"""
+        Sen 'DATALIG AI' adında profesyonel bir futbol analistisin. 
+        TEKNİK DİREKTÖRÜN ODAKLANDIĞI OYUNCU: {secili_oyuncu}
+        (Kullanıcı 'bu', 'o', 'oyuncu' derse bu ismi kastettiğini bil.)
+
+        ARŞİV BİLGİLERİ:
+        {context if context else "Özel bir arşiv notu bulunamadı."}
+
+        SORU: {prompt}
+        
+        Lütfen analitik ve profesyonel bir dille cevap ver.
+        """
+        
+        try:
+            response = model.generate_content(prompt_taslagi)
+            ai_response = response.text
+            
+            # Kaynakları ekle
+            if kaynaklar and context:
+                ai_response += f"\n\n---\n**📚 Referans:** {', '.join(kaynaklar)}"
+            
+            msg_placeholder.markdown(ai_response)
+            st.session_state.messages.append({"role": "assistant", "content": ai_response})
+        except Exception as e:
+            st.error(f"Sistem Hatası: {e}")
