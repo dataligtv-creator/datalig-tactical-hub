@@ -81,10 +81,9 @@ st.markdown("---")
 if "GOOGLE_API_KEY" in st.secrets and "PINECONE_API_KEY" in st.secrets:
     genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
     
-    # MODELİ ÖNBELLEĞE ALIYORUZ (HATA 429 ÇÖZÜMÜ)
+    # MODELİ ÖNBELLEĞE AL (HATA 429 ÇÖZÜMÜ)
     @st.cache_resource
     def get_model():
-        # En stabil ve kota dostu model: 1.5 Flash
         return genai.GenerativeModel('gemini-1.5-flash')
     
     model = get_model()
@@ -95,21 +94,95 @@ if "GOOGLE_API_KEY" in st.secrets and "PINECONE_API_KEY" in st.secrets:
         pinecone_index = pc.Index(index_name)
         embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
         db_status = "ONLINE"
-        db_color = "#00e5ff" 
+        db_color = "#00e5ff"
     except Exception as e:
         pinecone_index = None
         db_status = "OFFLINE"
-        db_color = "#ef4444" 
+        db_color = "#ef4444"
 else:
     st.error("🚨 API KEY EKSİK! Lütfen Secrets ayarlarını kontrol et.")
     st.stop()
 
-# --- SIDEBAR ---
+# --- SIDEBAR (HATALI KISIM DÜZELTİLDİ) ---
 with st.sidebar:
-    st.markdown(f"""
+    # f-string içindeki HTML'i düzgünce hizaladık
+    sidebar_html = f"""
     <div style="padding: 10px; background: rgba(0, 229, 255, 0.05); border: 1px solid rgba(0, 229, 255, 0.1); border-radius: 8px; margin-bottom: 20px;">
         <div style="font-family: 'JetBrains Mono'; font-size: 12px; color: #94a3b8;">SYSTEM STATUS</div>
         <div style="display: flex; align-items: center; gap: 8px; margin-top: 5px;">
             <div style="width: 8px; height: 8px; background-color: {db_color}; border-radius: 50%; box-shadow: 0 0 10px {db_color};"></div>
             <div style="font-weight: bold; color: white;">{db_status}</div>
         </div>
+    </div>
+    """
+    st.markdown(sidebar_html, unsafe_allow_html=True)
+    
+    st.markdown("### 🛠️ KONTROL PANELİ")
+    st.info("Model: **Gemini 1.5 Flash**")
+    st.info("Motor: **HuggingFace**")
+    
+    if st.button("🔒 Çıkış Yap"):
+        st.session_state.authenticated = False
+        st.rerun()
+
+# --- CHAT ---
+if "messages" not in st.session_state:
+    st.session_state.messages = [{"role": "assistant", "content": "Sistem hazır teknik direktörüm. Analiz verileri emrine amade."}]
+
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
+
+def arsivden_bul(soru):
+    if not pinecone_index: return None, []
+    try:
+        soru_vektor = embeddings.embed_query(soru)
+        sonuc = pinecone_index.query(vector=soru_vektor, top_k=4, include_metadata=True)
+        metinler = ""
+        kaynaklar = []
+        for match in sonuc['matches']:
+            if 'text' in match['metadata']:
+                metinler += match['metadata']['text'] + "\n\n"
+                kaynaklar.append(match['metadata'].get('source', 'Unknown'))
+        return metinler, list(set(kaynaklar))
+    except: return None, []
+
+if prompt := st.chat_input("Taktiksel analiz sorgusu..."):
+    st.session_state.messages.append({"role": "user", "content": prompt})
+    with st.chat_message("user"):
+        st.markdown(prompt)
+
+    with st.chat_message("assistant"):
+        message_placeholder = st.empty()
+        with st.status("⚡ VERİ İŞLENİYOR...", expanded=True) as status:
+            st.write("Vektör veritabanı taranıyor...")
+            context, kaynaklar = arsivden_bul(prompt)
+            st.write("Taktiksel desenler eşleştiriliyor...")
+            time.sleep(0.3)
+            status.update(label="ANALİZ TAMAMLANDI", state="complete", expanded=False)
+        
+        prompt_taslagi = """
+        Sen 'DATALIG AI' adında profesyonel bir futbol analistisin.
+        Aşağıdaki arşiv verilerini kullanarak teknik direktör seviyesinde cevap ver.
+        
+        SORU: {soru}
+        ARŞİV: {bilgi}
+        """
+        final_prompt = prompt_taslagi.format(soru=prompt, bilgi=context if context else "(Veri yok)")
+        
+        try:
+            response = model.generate_content(final_prompt)
+            ai_response = response.text
+            
+            if kaynaklar:
+                ai_response += "\n\n<div style='background: rgba(0, 229, 255, 0.05); padding: 10px; border-radius: 8px; border: 1px solid rgba(0, 229, 255, 0.1); margin-top: 15px;'>"
+                ai_response += "<div style='font-family: JetBrains Mono; font-size: 12px; color: #00e5ff; margin-bottom: 5px;'>📚 REFERANS DOSYALAR</div>"
+                for k in kaynaklar:
+                    ai_response += f"<div style='font-size: 12px; color: #94a3b8;'>📄 {k}</div>"
+                ai_response += "</div>"
+            
+            message_placeholder.markdown(ai_response, unsafe_allow_html=True)
+            st.session_state.messages.append({"role": "assistant", "content": ai_response})
+        
+        except Exception as e:
+            st.error(f"Sistem Hatası: {e}")
