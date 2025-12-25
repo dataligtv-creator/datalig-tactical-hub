@@ -187,3 +187,44 @@ if prompt := st.chat_input("Taktiksel analiz sorgusu..."):
         
         except Exception as e:
             st.error(f"Sistem Hatası: {e}")
+
+# ... (Mevcut kodların devamı)
+
+# --- 🧠 AKTİF ÖĞRENME MODÜLÜ (MEMORY FEEDBACK) ---
+with st.sidebar:
+    st.markdown("---")
+    st.markdown("### 🧠 SİSTEMİ EĞİT")
+    st.info("AI'ya yeni bir taktik bilgi veya takım özelliği öğretmek ister misin?")
+    
+    yeni_bilgi = st.text_area("Öğretilecek Bilgi:", placeholder="Örn: Bizim takımın bekleri hızlı değil, bu yüzden kanat organizasyonlarında bekleme yapmamalıyız.")
+    kaynak_etiketi = st.text_input("Etiket (Referans):", value="Teknik Direktör Notu")
+    
+    if st.button("💾 Hafızaya Kaydet"):
+        if yeni_bilgi and pinecone_index:
+            try:
+                # 1. Metni Vektöre Çevir
+                vektor = embeddings.embed_query(yeni_bilgi)
+                
+                # 2. Benzersiz ID Oluştur (Zaman damgası ile)
+                import uuid
+                vector_id = str(uuid.uuid4())
+                
+                # 3. Pinecone'a Yükle (Upsert)
+                pinecone_index.upsert(
+                    vectors=[{
+                        "id": vector_id,
+                        "values": vektor,
+                        "metadata": {
+                            "text": yeni_bilgi,
+                            "source": kaynak_etiketi,
+                            "type": "user_feedback" # Filtreleme için kullanılabilir
+                        }
+                    }]
+                )
+                st.success("✅ Bilgi sisteme işlendi! Artık analizlerde bunu dikkate alacağım.")
+                time.sleep(2)
+                st.rerun()
+            except Exception as e:
+                st.error(f"Hata: {e}")
+        else:
+            st.warning("Lütfen bilgi giriniz veya veritabanı bağlantısını kontrol ediniz.")
