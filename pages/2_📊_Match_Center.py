@@ -1,142 +1,104 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
-from mplsoccer import Pitch, VerticalPitch
+import plotly.express as px
+import plotly.graph_objects as go
+from mplsoccer import Pitch
 
 # --- SAYFA AYARLARI ---
-st.set_page_config(page_title="Match Center | DATALIG", page_icon="📊", layout="wide")
+st.set_page_config(page_title="Match Center Pro | DATALIG", page_icon="📊", layout="wide")
 
-# --- CSS (NEON TEMA) ---
+# --- CSS ---
 st.markdown("""
 <style>
     .stApp { background-color: #0b0f19; }
     h1, h2, h3 { color: white !important; font-family: 'monospace'; }
-    .stMetric { background-color: rgba(30, 41, 59, 0.5); border: 1px solid rgba(255, 255, 255, 0.1); }
+    .stMetric { background-color: rgba(30, 41, 59, 0.5); padding: 15px; border-radius: 10px; border: 1px solid #00e5ff; }
 </style>
 """, unsafe_allow_html=True)
 
 # --- BAŞLIK ---
-col1, col2 = st.columns([1, 10])
-with col1:
-    st.markdown("<div style='font-size: 40px;'>📊</div>", unsafe_allow_html=True)
-with col2:
-    st.title("MATCH CENTER")
-    st.caption("Veri Görselleştirme & Pas Ağları")
+st.title("📊 MATCH CENTER PRO")
+st.caption("Interaktif Veri Analiz Paneli")
+st.markdown("---")
+
+# --- DATA SİMÜLASYONU (Daha detaylı) ---
+def get_advanced_shots():
+    return pd.DataFrame({
+        'Oyuncu': np.random.choice(['Icardi', 'Rafa Silva', 'Immobile', 'Dzeko'], 20),
+        'x': np.random.uniform(70, 115, 20),
+        'y': np.random.uniform(20, 60, 20),
+        'xG': np.random.uniform(0.1, 0.8, 20).round(2),
+        'Dakika': np.random.randint(1, 90, 20),
+        'Sonuç': np.random.choice(['Gol', 'Kaçtı'], 20, p=[0.3, 0.7])
+    })
+
+shots_df = get_advanced_shots()
+
+# --- METRİKLER ---
+c1, c2, c3, c4 = st.columns(4)
+c1.metric("Toplam xG", f"{shots_df['xG'].sum():.2f}")
+c2.metric("Şut Başı xG", f"{shots_df['xG'].mean():.2f}")
+c3.metric("Gol", len(shots_df[shots_df['Sonuç'] == 'Gol']))
+c4.metric("İsabetli Şut", "12/20")
 
 st.markdown("---")
 
-# --- DEMO VERİ ÜRETİCİLERİ ---
-def get_shot_data():
-    # Rastgele şut verisi üret
-    return pd.DataFrame({
-        'x': np.random.uniform(60, 118, 15),
-        'y': np.random.uniform(10, 70, 15),
-        'xg': np.random.uniform(0.05, 0.7, 15),
-        'is_goal': np.random.choice([True, False], 15, p=[0.2, 0.8])
-    })
+# --- PLOTLY INTERAKTİF ŞUT HARİTASI ---
+st.markdown("### 🎯 Interaktif Şut Analizi")
+st.info("İncelemek istediğiniz şutun üzerine gelin veya grafiği yakınlaştırın.")
 
-def get_pass_network_data():
-    # 11 Oyuncu için sabit pozisyonlar (4-3-3 gibi)
-    # x: saha boyu (0-120), y: saha eni (0-80)
-    players = {
-        1: {'name': 'GK', 'x': 5, 'y': 40, 'passes': 25},
-        2: {'name': 'RB', 'x': 30, 'y': 10, 'passes': 45},
-        3: {'name': 'RCB', 'x': 25, 'y': 30, 'passes': 60},
-        4: {'name': 'LCB', 'x': 25, 'y': 50, 'passes': 62},
-        5: {'name': 'LB', 'x': 30, 'y': 70, 'passes': 48},
-        6: {'name': 'CDM', 'x': 50, 'y': 40, 'passes': 75},
-        7: {'name': 'RCM', 'x': 65, 'y': 25, 'passes': 55},
-        8: {'name': 'LCM', 'x': 65, 'y': 55, 'passes': 58},
-        9: {'name': 'RW', 'x': 90, 'y': 15, 'passes': 30},
-        10: {'name': 'ST', 'x': 100, 'y': 40, 'passes': 20},
-        11: {'name': 'LW', 'x': 90, 'y': 65, 'passes': 32}
-    }
-    return players
+# Saha Çizimi (Plotly Arkaplanı olarak)
+fig = go.Figure()
 
-# --- SEKME YAPISI ---
-tabs = st.tabs(["🕸️ PAS AĞI (NETWORK)", "🎯 ŞUT ANALİZİ (xG)", "🔥 ISI HARİTASI"])
-
-# --- 1. SEKME: PAS AĞI ---
-with tabs[0]:
-    col_info, col_pitch = st.columns([1, 3])
+# Plotly ile Şutları Çiz
+for result in ['Gol', 'Kaçtı']:
+    mask = shots_df['Sonuç'] == result
+    color = '#22c55e' if result == 'Gol' else '#ef4444'
+    symbol = 'circle' if result == 'Gol' else 'x'
     
-    with col_info:
-        st.info("Bu grafik oyuncuların ortalama pozisyonlarını ve pas bağlantılarını gösterir.")
-        st.metric("Toplam Pas", "512", delta="+%12")
-        st.metric("Pas İsabeti", "%84", delta="Başarılı")
-        st.markdown("### 🔑 Kilit Bağlantı")
-        st.write("CDM ➡️ LCM (18 Pas)")
+    fig.add_trace(go.Scatter(
+        x=shots_df[mask]['x'],
+        y=shots_df[mask]['y'],
+        mode='markers',
+        name=result,
+        marker=dict(
+            size=shots_df[mask]['xG'] * 40,
+            color=color,
+            symbol=symbol,
+            line=dict(width=1, color='white')
+        ),
+        hovertemplate="<b>%{customdata[0]}</b><br>" +
+                      "Dakika: %{customdata[1]}<br>" +
+                      "xG: %{marker.size}<br>" +
+                      "Sonuç: %{text}<extra></extra>",
+        customdata=shots_df[mask][['Oyuncu', 'Dakika']],
+        text=shots_df[mask]['Sonuç']
+    ))
 
-    with col_pitch:
-        # Saha Çizimi
-        pitch = Pitch(pitch_type='statsbomb', pitch_color='#0b0f19', line_color='#555555')
-        fig, ax = pitch.draw(figsize=(10, 7))
-        fig.set_facecolor('#0b0f19')
-        
-        players = get_pass_network_data()
-        
-        # Pas Bağlantılarını Çiz (Lines)
-        # Basitlik için CDM'den herkese hat çekiyoruz (Demo)
-        cdm = players[6]
-        for pid, p in players.items():
-            if pid != 6:
-                pitch.lines(cdm['x'], cdm['y'], p['x'], p['y'],
-                            lw=p['passes']/10, color='#00e5ff', alpha=0.3, zorder=1, ax=ax)
+# Saha Çizgilerini Ekle (Plotly üzerine futbol sahası şablonu)
+fig.update_layout(
+    width=900, height=600,
+    template="plotly_dark",
+    paper_bgcolor='#0b0f19',
+    plot_bgcolor='#0b0f19',
+    xaxis=dict(range=[0, 120], showgrid=False, zeroline=False, visible=False),
+    yaxis=dict(range=[0, 80], showgrid=False, zeroline=False, visible=False),
+    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+)
 
-        # Oyuncuları Çiz (Nodes)
-        for pid, p in players.items():
-            pitch.scatter(p['x'], p['y'], s=p['passes']*8, 
-                          color='#0b0f19', edgecolor='#00e5ff', linewidth=2, zorder=2, ax=ax)
-            
-            pitch.annotate(p['name'], xy=(p['x'], p['y']), 
-                           va='center', ha='center', color='white', fontsize=10, zorder=3, ax=ax)
+# Kale ve Ceza Sahası Çizgileri (Opsiyonel görsel dokunuş)
+fig.add_shape(type="rect", x0=102, y0=18, x1=120, y1=62, line_color="white") # Ceza sahası
+fig.add_shape(type="rect", x0=114, y0=30, x1=120, y1=50, line_color="white") # 6 pas
 
-        st.pyplot(fig)
+st.plotly_chart(fig, use_container_width=True)
 
-# --- 2. SEKME: ŞUT HARİTASI ---
-with tabs[1]:
-    col_viz, col_stat = st.columns([3, 1])
-    
-    shots = get_shot_data()
-    
-    with col_stat:
-        st.markdown("### 📈 xG ÖZETİ")
-        st.metric("Toplam Şut", len(shots))
-        st.metric("Toplam xG", f"{shots['xg'].sum():.2f}")
-        st.caption("Daire büyüklüğü gol beklentisini (xG) ifade eder.")
-
-    with col_viz:
-        pitch = Pitch(pitch_type='statsbomb', pitch_color='#0b0f19', line_color='#555555')
-        fig, ax = pitch.draw(figsize=(10, 7))
-        fig.set_facecolor('#0b0f19')
-        
-        # Gol Olmayanlar
-        miss = shots[~shots['is_goal']]
-        pitch.scatter(miss.x, miss.y, s=miss.xg*500, c='#ef4444', alpha=0.6, marker='x', label='Kaçan', ax=ax)
-        
-        # Gol Olanlar
-        goal = shots[shots['is_goal']]
-        pitch.scatter(goal.x, goal.y, s=goal.xg*500, c='#22c55e', edgecolors='white', marker='football', label='GOL', ax=ax)
-        
-        ax.legend(facecolor='#0b0f19', edgecolor='white', labelcolor='white')
-        st.pyplot(fig)
-
-# --- 3. SEKME: ISI HARİTASI ---
-with tabs[2]:
-    st.markdown("### 🔥 TAKIM YOĞUNLUK HARİTASI")
-    
-    pitch = Pitch(pitch_type='statsbomb', line_zorder=2, pitch_color='#0b0f19', line_color='#555555')
-    fig, ax = pitch.draw(figsize=(10, 7))
-    fig.set_facecolor('#0b0f19')
-    
-    # Rastgele yoğunluk verisi (Demo)
-    x = np.random.normal(60, 20, 100)
-    y = np.random.normal(40, 15, 100)
-    
-    # KDE Plot (Isı Haritası)
-    # Hata almamak için 'shade' yerine 'fill' kullanıyoruz (yeni sürüm uyumlu)
-    sns_cmap = "magma"
-    pitch.kdeplot(x, y, ax=ax, cmap=sns_cmap, fill=True, levels=100, alpha=0.6)
-    
-    st.pyplot(fig)
+# --- ALT ANALİZ: OYUNCU BAZLI ŞUT DAĞILIMI ---
+st.markdown("### 📊 Oyuncu Performans Kıyaslama")
+fig_bar = px.bar(
+    shots_df, x='Oyuncu', y='xG', color='Sonuç',
+    title="Oyuncuların Toplam xG Katkısı",
+    color_discrete_map={'Gol': '#22c55e', 'Kaçtı': '#ef4444'},
+    template="plotly_dark"
+)
+st.plotly_chart(fig_bar, use_container_width=True)
