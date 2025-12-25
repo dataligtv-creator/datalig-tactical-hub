@@ -1,6 +1,6 @@
 streamlit
 google-generativeai
-pinecone-client
+pinecone
 langchain
 langchain-community
 sentence-transformers
