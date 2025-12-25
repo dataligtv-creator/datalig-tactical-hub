@@ -1,81 +1,142 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
+from mplsoccer import Pitch, VerticalPitch
 
+# --- SAYFA AYARLARI ---
 st.set_page_config(page_title="Match Center | DATALIG", page_icon="📊", layout="wide")
 
-# --- CSS ---
+# --- CSS (NEON TEMA) ---
 st.markdown("""
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
-    :root { --primary: #00e5ff; --alert: #ef4444; --bg: #0b0f19; }
-    .stApp { background-color: var(--bg); background-image: linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px); background-size: 40px 40px; }
-    .scoreboard { background: linear-gradient(180deg, rgba(15,23,42,0.8) 0%, rgba(15,23,42,0.95) 100%); border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 20px; text-align: center; color: white; margin-bottom: 20px; }
-    .score { font-size: 60px; font-weight: 700; font-family: 'JetBrains Mono'; letter-spacing: -2px; }
-    .team-name { font-size: 24px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
-    .live-badge { background: rgba(239, 68, 68, 0.2); color: #ef4444; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: bold; border: 1px solid rgba(239, 68, 68, 0.4); animation: pulse 2s infinite; }
-    @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+    .stApp { background-color: #0b0f19; }
+    h1, h2, h3 { color: white !important; font-family: 'monospace'; }
+    .stMetric { background-color: rgba(30, 41, 59, 0.5); border: 1px solid rgba(255, 255, 255, 0.1); }
 </style>
 """, unsafe_allow_html=True)
 
-# --- SKORBORD ---
-st.markdown("""
-<div class="scoreboard">
-    <span class="live-badge">● LIVE 74:12</span>
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px;">
-        <div style="flex: 1;">
-            <div class="team-name">Man City</div>
-            <div style="color: #94a3b8; font-size: 14px;">(2.34 xG)</div>
-        </div>
-        <div class="score">2 - 1</div>
-        <div style="flex: 1;">
-            <div class="team-name">Liverpool</div>
-            <div style="color: #94a3b8; font-size: 14px;">(0.98 xG)</div>
-        </div>
-    </div>
-    <div style="margin-top: 15px; width: 100%; height: 6px; background: #334155; border-radius: 3px; overflow: hidden;">
-        <div style="width: 62%; height: 100%; background: #00e5ff; float: left;"></div>
-        <div style="width: 38%; height: 100%; background: #ef4444; float: right;"></div>
-    </div>
-    <div style="display: flex; justify-content: space-between; font-size: 10px; color: #94a3b8; margin-top: 5px; font-family: 'JetBrains Mono';">
-        <span>POSSESSION: 62%</span>
-        <span>38%</span>
-    </div>
-</div>
-""", unsafe_allow_html=True)
-
-# --- MOMENTUM VE İSTATİSTİKLER ---
-col1, col2 = st.columns([2, 1])
-
+# --- BAŞLIK ---
+col1, col2 = st.columns([1, 10])
 with col1:
-    st.subheader("📈 Momentum Swing")
-    # Rastgele momentum verisi üretelim
-    chart_data = pd.DataFrame(np.random.randn(90, 1), columns=["Momentum"]).cumsum()
-    st.area_chart(chart_data, color="#00e5ff", height=250)
-    
-    st.markdown("### 🔑 Key Events")
-    st.markdown("""
-    - **72'** ⚽ **GOAL!** Phil Foden (Assist: K. De Bruyne)
-    - **45'** 🟨 Yellow Card - Rodri
-    - **12'** ⚽ **GOAL!** Erling Haaland
-    """)
-
+    st.markdown("<div style='font-size: 40px;'>📊</div>", unsafe_allow_html=True)
 with col2:
-    st.subheader("📊 Match Stats")
-    
-    stats = {
-        "Shots": ("14", "8"),
-        "On Target": ("6", "3"),
-        "Passes": ("542", "312"),
-        "Pass Accuracy": ("89%", "81%"),
-        "Corners": ("8", "2")
+    st.title("MATCH CENTER")
+    st.caption("Veri Görselleştirme & Pas Ağları")
+
+st.markdown("---")
+
+# --- DEMO VERİ ÜRETİCİLERİ ---
+def get_shot_data():
+    # Rastgele şut verisi üret
+    return pd.DataFrame({
+        'x': np.random.uniform(60, 118, 15),
+        'y': np.random.uniform(10, 70, 15),
+        'xg': np.random.uniform(0.05, 0.7, 15),
+        'is_goal': np.random.choice([True, False], 15, p=[0.2, 0.8])
+    })
+
+def get_pass_network_data():
+    # 11 Oyuncu için sabit pozisyonlar (4-3-3 gibi)
+    # x: saha boyu (0-120), y: saha eni (0-80)
+    players = {
+        1: {'name': 'GK', 'x': 5, 'y': 40, 'passes': 25},
+        2: {'name': 'RB', 'x': 30, 'y': 10, 'passes': 45},
+        3: {'name': 'RCB', 'x': 25, 'y': 30, 'passes': 60},
+        4: {'name': 'LCB', 'x': 25, 'y': 50, 'passes': 62},
+        5: {'name': 'LB', 'x': 30, 'y': 70, 'passes': 48},
+        6: {'name': 'CDM', 'x': 50, 'y': 40, 'passes': 75},
+        7: {'name': 'RCM', 'x': 65, 'y': 25, 'passes': 55},
+        8: {'name': 'LCM', 'x': 65, 'y': 55, 'passes': 58},
+        9: {'name': 'RW', 'x': 90, 'y': 15, 'passes': 30},
+        10: {'name': 'ST', 'x': 100, 'y': 40, 'passes': 20},
+        11: {'name': 'LW', 'x': 90, 'y': 65, 'passes': 32}
     }
+    return players
+
+# --- SEKME YAPISI ---
+tabs = st.tabs(["🕸️ PAS AĞI (NETWORK)", "🎯 ŞUT ANALİZİ (xG)", "🔥 ISI HARİTASI"])
+
+# --- 1. SEKME: PAS AĞI ---
+with tabs[0]:
+    col_info, col_pitch = st.columns([1, 3])
     
-    for stat, values in stats.items():
-        st.markdown(f"""
-        <div style="display: flex; justify-content: space-between; margin-bottom: 10px; padding: 10px; background: rgba(255,255,255,0.05); border-radius: 8px;">
-            <span style="color: #00e5ff; font-weight: bold;">{values[0]}</span>
-            <span style="color: #94a3b8; font-size: 14px;">{stat}</span>
-            <span style="color: #ef4444; font-weight: bold;">{values[1]}</span>
-        </div>
-        """, unsafe_allow_html=True)
+    with col_info:
+        st.info("Bu grafik oyuncuların ortalama pozisyonlarını ve pas bağlantılarını gösterir.")
+        st.metric("Toplam Pas", "512", delta="+%12")
+        st.metric("Pas İsabeti", "%84", delta="Başarılı")
+        st.markdown("### 🔑 Kilit Bağlantı")
+        st.write("CDM ➡️ LCM (18 Pas)")
+
+    with col_pitch:
+        # Saha Çizimi
+        pitch = Pitch(pitch_type='statsbomb', pitch_color='#0b0f19', line_color='#555555')
+        fig, ax = pitch.draw(figsize=(10, 7))
+        fig.set_facecolor('#0b0f19')
+        
+        players = get_pass_network_data()
+        
+        # Pas Bağlantılarını Çiz (Lines)
+        # Basitlik için CDM'den herkese hat çekiyoruz (Demo)
+        cdm = players[6]
+        for pid, p in players.items():
+            if pid != 6:
+                pitch.lines(cdm['x'], cdm['y'], p['x'], p['y'],
+                            lw=p['passes']/10, color='#00e5ff', alpha=0.3, zorder=1, ax=ax)
+
+        # Oyuncuları Çiz (Nodes)
+        for pid, p in players.items():
+            pitch.scatter(p['x'], p['y'], s=p['passes']*8, 
+                          color='#0b0f19', edgecolor='#00e5ff', linewidth=2, zorder=2, ax=ax)
+            
+            pitch.annotate(p['name'], xy=(p['x'], p['y']), 
+                           va='center', ha='center', color='white', fontsize=10, zorder=3, ax=ax)
+
+        st.pyplot(fig)
+
+# --- 2. SEKME: ŞUT HARİTASI ---
+with tabs[1]:
+    col_viz, col_stat = st.columns([3, 1])
+    
+    shots = get_shot_data()
+    
+    with col_stat:
+        st.markdown("### 📈 xG ÖZETİ")
+        st.metric("Toplam Şut", len(shots))
+        st.metric("Toplam xG", f"{shots['xg'].sum():.2f}")
+        st.caption("Daire büyüklüğü gol beklentisini (xG) ifade eder.")
+
+    with col_viz:
+        pitch = Pitch(pitch_type='statsbomb', pitch_color='#0b0f19', line_color='#555555')
+        fig, ax = pitch.draw(figsize=(10, 7))
+        fig.set_facecolor('#0b0f19')
+        
+        # Gol Olmayanlar
+        miss = shots[~shots['is_goal']]
+        pitch.scatter(miss.x, miss.y, s=miss.xg*500, c='#ef4444', alpha=0.6, marker='x', label='Kaçan', ax=ax)
+        
+        # Gol Olanlar
+        goal = shots[shots['is_goal']]
+        pitch.scatter(goal.x, goal.y, s=goal.xg*500, c='#22c55e', edgecolors='white', marker='football', label='GOL', ax=ax)
+        
+        ax.legend(facecolor='#0b0f19', edgecolor='white', labelcolor='white')
+        st.pyplot(fig)
+
+# --- 3. SEKME: ISI HARİTASI ---
+with tabs[2]:
+    st.markdown("### 🔥 TAKIM YOĞUNLUK HARİTASI")
+    
+    pitch = Pitch(pitch_type='statsbomb', line_zorder=2, pitch_color='#0b0f19', line_color='#555555')
+    fig, ax = pitch.draw(figsize=(10, 7))
+    fig.set_facecolor('#0b0f19')
+    
+    # Rastgele yoğunluk verisi (Demo)
+    x = np.random.normal(60, 20, 100)
+    y = np.random.normal(40, 15, 100)
+    
+    # KDE Plot (Isı Haritası)
+    # Hata almamak için 'shade' yerine 'fill' kullanıyoruz (yeni sürüm uyumlu)
+    sns_cmap = "magma"
+    pitch.kdeplot(x, y, ax=ax, cmap=sns_cmap, fill=True, levels=100, alpha=0.6)
+    
+    st.pyplot(fig)
