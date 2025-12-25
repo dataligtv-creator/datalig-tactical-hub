@@ -1,7 +1,6 @@
 import streamlit as st
-import pandas as pd
-from mplsoccer import VerticalPitch
 import matplotlib.pyplot as plt
+from mplsoccer import VerticalPitch
 
 # --- SAYFA AYARLARI ---
 st.set_page_config(page_title="War Room | DATALIG", page_icon="📋", layout="wide")
@@ -34,35 +33,52 @@ with col_sidebar:
     defense_style = st.radio("Savunma Tipi", ["Adam Adama Markaj", "Alan Savunması", "Yüksek Pres"])
     
     if st.button("Taktiği Onayla"):
-        st.success("Taktiksel plan başarıyla kaydedildi.")
+        st.success("Taktiksel plan kaydedildi.")
 
-# --- SAHA VE FORMASYON MANTIĞI ---
+# --- SAHA VE FORMASYON ÇİZİMİ ---
 with col_pitch:
-    pitch = VerticalPitch(pitch_type='statsbomb', pitch_color='#0b0f19', line_color='#555555', half=False)
+    # Saha kurulumu
+    pitch = VerticalPitch(pitch_type='statsbomb', pitch_color='#0b0f19', line_color='#555555')
     fig, ax = pitch.draw(figsize=(8, 11))
     fig.set_facecolor('#0b0f19')
 
-    # --- OYUNCU POZİSYONLARI (SÖZLÜK YAPISI) ---
+    # Koordinat veri tabanı
     formations_db = {
-        "4-3-3": [
-            (15, 40), # GK
-            (30, 15), (30, 65), (25, 30), (25, 50), # Defans
-            (50, 40), (65, 25), (65, 55), # Orta Saha
-            (95, 15), (95, 65), (105, 40) # Hücum
-        ],
-        "4-2-3-1": [
-            (15, 40), # GK
-            (30, 15), (30, 65), (25, 32), (25, 48), # Defans
-            (45, 30), (45, 50), # Ön Libero
-            (75, 40), (85, 15), (85, 65), # Ofansif Hat
-            (105, 40) # ST
-        ],
-        "3-5-2": [
-            (15, 40), # GK
-            (25, 25), (25, 40), (25, 55), # 3 Stoper
-            (50, 10), (50, 70), (55, 40), (65, 28), (65, 52), # 5'li Orta Saha
-            (100, 30), (100, 50) # 2 Forvet
-        ],
-        "4-4-2": [
-            (15, 40), # GK
-            (30, 15), (30, 65), (25, 32), (
+        "4-3-3": [(15, 40), (30, 15), (30, 65), (25, 30), (25, 50), (50, 40), (65, 25), (65, 55), (95, 15), (95, 65), (105, 40)],
+        "4-2-3-1": [(15, 40), (30, 15), (30, 65), (25, 32), (25, 48), (45, 30), (45, 50), (75, 40), (85, 15), (85, 65), (105, 40)],
+        "3-5-2": [(15, 40), (25, 25), (25, 40), (25, 55), (50, 10), (50, 70), (55, 40), (65, 28), (65, 52), (100, 30), (100, 50)],
+        "4-4-2": [(15, 40), (30, 15), (30, 65), (25, 32), (25, 48), (60, 15), (60, 35), (60, 45), (60, 65), (100, 35), (100, 45)]
+    }
+
+    # Oyuncuları çiz
+    coords = formations_db.get(formation, [])
+    for x, y in coords:
+        pitch.scatter(x, y, s=500, color='#0b0f19', edgecolor='#00e5ff', linewidth=2, zorder=3, ax=ax)
+
+    # Rakip Tehlike Halkası
+    pitch.scatter(85, 40, s=800, color='none', edgecolor='#ff0055', linewidth=3, linestyle='--', zorder=2, ax=ax)
+    ax.text(40, 85, f"TEHLİKE: {aktif_oyuncu}", color='#ff0055', fontsize=14, ha='center', fontweight='bold')
+
+    st.pyplot(fig)
+
+# --- ANALİZ RAPORU ---
+st.markdown("---")
+c1, c2 = st.columns(2)
+
+with c1:
+    st.markdown(f'<div class="report-box"><h4>⚽ {aktif_oyuncu} Analizi</h4>', unsafe_allow_html=True)
+    if "Icardi" in aktif_oyuncu:
+        st.write("Ceza sahası içinde öldürücü. Kaleye sırtı dönükken bile tehlikeli.")
+    elif "Dzeko" in aktif_oyuncu:
+        st.write("Bağlantı oyununda usta. Hava toplarında mutlak üstünlüğü var.")
+    elif "Rafa" in aktif_oyuncu:
+        st.write("Patlayıcı hızı var. Geçiş hücumlarında durdurulması imkansız.")
+    else:
+        st.write("Teknik kapasitesi yüksek, dar alanda çözüm üretebilen bir oyuncu.")
+    st.markdown('</div>', unsafe_allow_html=True)
+
+with c2:
+    st.markdown(f'<div class="report-box" style="border-left-color: #00e5ff;"><h4>🛡️ Savunma Reçetesi</h4>', unsafe_allow_html=True)
+    st.write(f"Hocam, {formation} dizilişinde {defense_style} kurgusu rakibi bozacaktır.")
+    st.write("Özellikle merkez bloktaki oyuncuların rakiple temaslı oynaması gerekiyor.")
+    st.markdown('</div>', unsafe_allow_html=True)
