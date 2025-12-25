@@ -8,3 +8,5 @@ langchain-huggingface
 plotly
 pandas
 numpy
+mplsoccer
+matplotlib
