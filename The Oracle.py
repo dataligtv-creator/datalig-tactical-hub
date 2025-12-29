@@ -51,7 +51,7 @@ if "GOOGLE_API_KEY" in st.secrets and "PINECONE_API_KEY" in st.secrets:
     @st.cache_resource
     def get_model():
         # Senin zaman dilimindeki en stabil model
-        return genai.GenerativeModel('gemini-2.5-flash')
+        return genai.GenerativeModel('gemini-3-flash')
     
     model = get_model()
 
