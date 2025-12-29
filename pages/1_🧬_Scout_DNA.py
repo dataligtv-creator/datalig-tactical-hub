@@ -1,168 +1,98 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
-import plotly.graph_objects as go
+import plotly.express as px
 
-# --- 🛰️ ORACLE BAĞLANTISI ---
-context = st.session_state.get('tactic_context', {})
-active_team = context.get('focus_team', 'Genel')
-active_formation = context.get('formation', 'Bilinmiyor')
+# --- 🛰️ ORACLE BAĞLANTISI (CONTEXT) ---
+tactic_context = st.session_state.get('tactic_context', {})
+focus_team = tactic_context.get('focus_team', 'Genel')
+focus_formation = tactic_context.get('formation', '4-3-3')
+oracle_report = tactic_context.get('scouting_report', "")
 
-st.markdown(f"## 🧬 SCOUT DNA: {active_team}")
-
-if active_team != 'Genel':
-    st.success(f"🎯 Oracle Odak Noktası: **{active_team}** takımı için **{active_formation}** analizi yapılıyor.")
-    # Burada internetten veya veri tabanından 'active_team'e göre oyuncuları getiriyoruz
-    # Örn: get_players_by_team(active_team)
-else:
-    st.info("💡 Oracle sayfasında bir taktik konuşarak burayı otomatize edebilirsiniz.")
 # --- SAYFA AYARLARI ---
-st.set_page_config(page_title="Scout DNA Pro | DATALIG", page_icon="🧬", layout="wide")
+st.set_page_config(page_title="Scout DNA | DATALIG", page_icon="🧬", layout="wide")
 
-# --- CSS (NEON TEMA) ---
+# --- CSS ---
 st.markdown("""
 <style>
     .stApp { background-color: #0b0f19; }
     h1, h2, h3 { color: white !important; font-family: 'monospace'; }
-    .stSelectbox > div > div { background-color: #1e293b !important; color: white !important; }
-    .stFileUploader { padding: 10px; border: 1px dashed #00e5ff; border-radius: 10px; }
-    .stMetric { background-color: rgba(30, 41, 59, 0.5); padding: 10px; border-radius: 10px; border-left: 5px solid #00e5ff; }
+    .scout-card { background: rgba(30, 41, 59, 0.5); border: 1px solid #1e293b; padding: 20px; border-radius: 10px; margin-bottom: 10px; }
+    .highlight-text { color: #00e5ff; font-weight: bold; }
 </style>
 """, unsafe_allow_html=True)
 
-# --- BAŞLIK ---
-st.markdown("### 🧬 SCOUT DNA PRO | <span style='color:#00e5ff;'>DATALIG</span>", unsafe_allow_html=True)
-st.caption("Interaktif Oyuncu Karşılaştırma Paneli")
+st.title("🧬 SCOUT DNA")
+st.caption("Veri Odaklı Oyuncu Seçimi ve Taktiksel Uyum")
 st.markdown("---")
 
-# --- 1. VERİ YÖNETİMİ ---
-default_data = {
-    'Oyuncu': ['Mauro Icardi', 'Edin Dzeko', 'Ciro Immobile', 'Rafa Silva', 'Gedson Fernandes', 'Fred'],
-    'Takım': ['Galatasaray', 'Fenerbahçe', 'Beşiktaş', 'Beşiktaş', 'Beşiktaş', 'Fenerbahçe'],
-    'HIZ': [75, 68, 80, 88, 85, 82],
-    'ŞUT': [88, 85, 87, 78, 70, 75],
-    'PAS': [70, 78, 72, 84, 82, 85],
-    'DRİBLİNG': [78, 72, 79, 89, 86, 84],
-    'DEFANS': [35, 45, 38, 45, 75, 78],
-    'FİZİK': [82, 85, 78, 65, 80, 76]
+# --- 🎯 AKILLI FİLTRELEME PANELİ ---
+with st.sidebar:
+    st.markdown(f"### 🎯 MEVCUT ODAK")
+    st.info(f"**Takım:** {focus_team}\n\n**Diziliş:** {focus_formation}")
+    
+    st.markdown("### 🔍 ÖZEL FİLTRELER")
+    age_range = st.slider("Yaş Aralığı", 16, 38, (18, 28))
+    market_value = st.slider("Piyasa Değeri (M€)", 0, 150, (0, 30))
+    
+    if st.button("Filtreleri Sıfırla"):
+        st.rerun()
+
+# --- 🤖 ORACLE'DAN GELEN TALİMAT ---
+if focus_team != "Genel":
+    st.markdown(f"""
+    <div class="scout-card" style="border-left: 5px solid #00e5ff;">
+        <h4>🧠 Oracle Analiz Notları (Otomatik)</h4>
+        <p>{oracle_report[:400]}...</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+# --- 📊 OYUNCU LİSTESİ VE KARŞILAŞTIRMA ---
+col1, col2 = st.columns([1, 1])
+
+# Örnek Veri Seti (Gerçek yapında bunu Pandas veya Pinecone'dan çekeceğiz)
+data = {
+    "Oyuncu": ["Archie Brown", "Filip Kostić", "Levent Mercan", "Oosterwolde"],
+    "Yaş": [23, 33, 24, 24],
+    "Hız": [92, 84, 86, 94],
+    "Defans": [78, 72, 75, 85],
+    "Hücum": [85, 89, 79, 74],
+    "Taktik Uyum (%)": [92, 88, 76, 95]
 }
+df = pd.DataFrame(data)
 
-with st.sidebar:
-    st.header("📂 VERİ MERKEZİ")
-    uploaded_file = st.file_uploader("Scout Dosyası Yükle (Excel/CSV)", type=["xlsx", "csv"])
+# Eğer Archie Brown konuşuluyorsa onu listenin başına al veya vurgula
+with col1:
+    st.markdown(f"### 📋 {focus_team} İçin Önerilen Listesi")
     
-    if uploaded_file is not None:
-        try:
-            if uploaded_file.name.endswith('.csv'):
-                df = pd.read_csv(uploaded_file)
-            else:
-                df = pd.read_excel(uploaded_file)
-            st.success("Veri seti yüklendi!")
-        except:
-            st.error("Hatalı dosya!")
-            df = pd.DataFrame(default_data)
-    else:
-        df = pd.DataFrame(default_data)
+    # Oracle'da geçen oyuncuları filtreleme mantığı
+    search_term = ""
+    if "Archie Brown" in oracle_report:
+        search_term = "Archie Brown"
+        st.success(f"💡 Oracle: **{search_term}** profili {focus_formation} için %92 uyumlu!")
 
-# --- 2. OYUNCU SEÇİM EKRANI ---
-col_select1, col_select2 = st.columns(2)
-player_list = df['Oyuncu'].unique().tolist()
-categories = ['HIZ', 'ŞUT', 'PAS', 'DRİBLİNG', 'DEFANS', 'FİZİK']
+    # Tablo Görünümü
+    st.dataframe(df.style.background_gradient(subset=['Taktik Uyum (%)'], cmap='Blues'), use_container_width=True)
 
-with col_select1:
-    st.markdown("### 🔵 OYUNCU 1 (ODAK)")
-    idx1 = player_list.index('Mauro Icardi') if 'Mauro Icardi' in player_list else 0
-    p1_name = st.selectbox("Oyuncu Seç", player_list, index=idx1, key="p1_select")
-    st.session_state['aktif_oyuncu'] = p1_name 
-    
-    p1_data = df[df['Oyuncu'] == p1_name].iloc[0]
-    p1_stats = [p1_data[c] for c in categories]
-    # Plotly radar için döngüyü kapatmak lazım (ilk elemanı sona ekle)
-    p1_stats_plot = p1_stats + [p1_stats[0]]
+with col2:
+    st.markdown("### 📈 Performans Karşılaştırması")
+    fig = px.bar(df, x="Oyuncu", y="Taktik Uyum (%)", color="Hız", 
+                 title=f"{focus_formation} Sistemine Uyum Skorları",
+                 color_continuous_scale='Bluered_r')
+    fig.update_layout(paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', font_color='white')
+    st.plotly_chart(fig, use_container_width=True)
 
-with col_select2:
-    st.markdown("### 🔴 OYUNCU 2 (RAKİP)")
-    idx2 = player_list.index('Edin Dzeko') if 'Edin Dzeko' in player_list else 1
-    p2_name = st.selectbox("Oyuncu Seç", player_list, index=idx2, key="p2_select")
-    
-    p2_data = df[df['Oyuncu'] == p2_name].iloc[0]
-    p2_stats = [p2_data[c] for c in categories]
-    p2_stats_plot = p2_stats + [p2_stats[0]]
-
-# --- 3. INTERAKTIF RADAR GRAFİĞİ (PLOTLY) ---
+# --- 🛡️ DETAYLI RADAR ANALİZİ ---
 st.markdown("---")
-st.markdown("### 📊 Interaktif Radar Karşılaştırma")
-st.info("Değerleri görmek için grafiğin üzerine gelin.")
+st.markdown("### 🕸️ Oyuncu DNA Profili")
+selected_player = st.selectbox("Analiz edilecek oyuncuyu seçin", df["Oyuncu"])
 
-categories_plot = categories + [categories[0]]
-
-fig = go.Figure()
-
-# Oyuncu 1 Trace
-fig.add_trace(go.Scatterpolar(
-    r=p1_stats_plot,
-    theta=categories_plot,
-    fill='toself',
-    name=p1_name,
-    line_color='#00e5ff',
-    fillcolor='rgba(0, 229, 255, 0.3)',
-    marker=dict(size=8)
+player_stats = df[df["Oyuncu"] == selected_player].iloc[0]
+radar_data = pd.DataFrame(dict(
+    r=[player_stats['Hız'], player_stats['Defans'], player_stats['Hücum'], player_stats['Taktik Uyum (%)'], 80],
+    theta=['Hız', 'Savunma', 'Hücum', 'Uyum', 'Pas']
 ))
 
-# Oyuncu 2 Trace
-fig.add_trace(go.Scatterpolar(
-    r=p2_stats_plot,
-    theta=categories_plot,
-    fill='toself',
-    name=p2_name,
-    line_color='#ff0055',
-    fillcolor='rgba(255, 0, 85, 0.3)',
-    marker=dict(size=8)
-))
-
-fig.update_layout(
-    polar=dict(
-        bgcolor='#0b0f19',
-        radialaxis=dict(
-            visible=True,
-            range=[0, 100],
-            gridcolor="#222222",
-            linecolor="#444444",
-            tickfont=dict(color="#94a3b8")
-        ),
-        angularaxis=dict(
-            gridcolor="#222222",
-            linecolor="#444444",
-            tickfont=dict(color="white", size=12)
-        )
-    ),
-    showlegend=True,
-    paper_bgcolor='#0b0f19',
-    plot_bgcolor='#0b0f19',
-    legend=dict(font=dict(color="white", size=14), orientation="h", y=-0.1),
-    margin=dict(t=20, b=20),
-    height=600
-)
-
-st.plotly_chart(fig, use_container_width=True)
-
-# --- 4. ÖZET İSTATİSTİK KARTLARI ---
-st.markdown("---")
-st.markdown("### 🧬 DNA ÖZETİ")
-c1, c2, c3 = st.columns(3)
-
-# Basit bir kıyaslama metriği
-diff_score = sum(p1_stats) - sum(p2_stats)
-color = "normal" if diff_score >= 0 else "inverse"
-
-with c1:
-    st.metric(f"{p1_name} Toplam", sum(p1_stats))
-with c2:
-    st.metric(f"{p2_name} Toplam", sum(p2_stats))
-with c3:
-    st.metric("Güç Farkı", diff_score)
-
-# Sidebar alt bilgi
-with st.sidebar:
-    st.markdown("---")
-    st.info(f"📍 Şu an odaklanılan: **{st.session_state['aktif_oyuncu']}**")
+fig_radar = px.line_polar(radar_data, r='r', theta='theta', line_close=True, range_r=[0,100])
+fig_radar.update_traces(fill='toself', line_color='#00e5ff')
+fig_radar.update_layout(paper_bgcolor='rgba(0,0,0,0)', font_color='white')
+st.plotly_chart(fig_radar, use_container_width=True)
