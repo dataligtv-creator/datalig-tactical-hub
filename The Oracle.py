@@ -1,82 +1,98 @@
 import streamlit as st
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 from pinecone import Pinecone
 from langchain_community.embeddings import HuggingFaceEmbeddings
-import time
 import uuid
 
-# --- SAYFA AYARLARI ---
-st.set_page_config(page_title="DATALIG Pro Suite", page_icon="⚽", layout="wide")
+# --- 🧠 SPORTİF YAZILIM MİMARİSİ AYARLARI ---
+st.set_page_config(page_title="DATALIG Oracle Pro", page_icon="⚽", layout="wide")
 
-# --- 🔐 GİRİŞ KONTROLÜ ---
-if 'authenticated' not in st.session_state:
-    st.session_state.authenticated = False
-
-def check_login():
-    if st.session_state.password == "datalig2025":
-        st.session_state.authenticated = True
-    else:
-        st.session_state.login_error = "Hatalı şifre teknik direktörüm!"
-
-if not st.session_state.authenticated:
-    st.markdown("<h2 style='text-align:center;'>DATALIG COCKPIT</h2>", unsafe_allow_html=True)
-    st.text_input("Şifre", type="password", key="password", on_change=check_login)
-    st.button("Giriş Yap", on_click=check_login)
-    st.stop()
-
-# --- 🚀 API & MODEL YAPILANDIRMASI (STABLE) ---
-if "GOOGLE_API_KEY" in st.secrets and "PINECONE_API_KEY" in st.secrets:
-    genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
+# --- 🚀 YENİ NESİL GOOGLE GEN AI SDK (ARALIK 2025) ---
+if "GOOGLE_API_KEY" in st.secrets:
+    # Yeni SDK ile Client tabanlı yapı
+    client = genai.Client(api_key=st.secrets["GOOGLE_API_KEY"])
     
-    @st.cache_resource
-    def get_model():
-        # Şu anki en kararlı ve uyumlu model
-        return genai.GenerativeModel('gemini-2.5-flash')
-    
-    model = get_model()
+    # Model Tanımlama: Gemini 3 Flash (Hız ve PhD seviyesi mantık)
+    MODEL_ID = "gemini-3-flash-preview" 
 
     try:
         pc = Pinecone(api_key=st.secrets["PINECONE_API_KEY"])
         pinecone_index = pc.Index("regista-arsiv")
         embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
-        db_status = "SYSTEM ONLINE"
-    except Exception:
-        db_status = "DB OFFLINE"
+    except Exception as e:
+        st.error(f"Veri tabanı bağlantı hatası: {e}")
 else:
     st.error("🚨 API KEY EKSİK!")
     st.stop()
 
-# --- ANA EKRAN ---
-st.sidebar.markdown(f"**DURUM:** {db_status}")
-st.markdown("### ⚽ DATALIG ORACLE V2.6")
+# --- 🛠️ TAKTİKSEL ANALİZ MOTORU ---
+def generate_tactical_response(user_query, context_data):
+    # Google Search Grounding Yapılandırması
+    # Halüsinasyonu önlemek için modelin internetten doğrulama yapmasını sağlar.
+    search_tool = types.Tool(google_search=types.GoogleSearch())
+    
+    # Taktiksel 'Thinking' Seviyesi (Aralık 2025 özelliği)
+    config = types.GenerateContentConfig(
+        tools=[search_tool],
+        # Modelin yanıt vermeden önce bir 'antrenör' gibi düşünmesini sağlar
+        thinking_config=types.ThinkingConfig(include_thoughts=True), 
+        temperature=1.0 # Google'ın grounding için önerdiği değer
+    )
+
+    # 15 yıllık futbol uzmanı persona'sı ve hibrit veri talimatı
+    system_instruction = f"""
+    Sen 15 yıllık deneyime sahip bir 'Futbol Stratejisti ve Performans Analisti'sin.
+    
+    VERİ KULLANIM KURALLARIN:
+    1. ÖĞRENME SETİ (ARŞİV): Aşağıdaki Bundesliga verilerini sadece TAKTİKSEL ANLAYIŞI kavramak için kullan. 
+       Arşiv Verisi: {context_data}
+    
+    2. GÜNCEL BİLGİ (SEARCH): Eğer soru güncel bir takım (örn: Fenerbahçe) veya oyuncu hakkındaysa, 
+       ASLA arşivdeki Bundesliga verileriyle kısıtlı kalma. Google Search kullanarak EN GÜNCEL ve DOĞRU bilgiyi bul.
+    
+    3. HARMANLAMA: Bulduğun güncel bilgiyi, arşivdeki taktiksel derinlikle (örn: Rakitic'in 3. bölge hareketliliği prensibi) harmanlayarak profesyonel bir TD raporu sun.
+    
+    4. GÜVENLİK: Bilmediğin veya internette doğrulanmayan transfer dedikodularına girme. Sadece teknik ve taktik analize odaklan.
+    """
+
+    response = client.models.generate_content(
+        model=MODEL_ID,
+        contents=user_query,
+        config=config
+    )
+    return response
+
+# --- 🖥️ STREAMLIT ARAYÜZÜ (CHAT) ---
+st.title("⚽ DATALIG ORACLE PRO")
+st.caption("Gemini 3 Flash & Google Search Grounding Entegrasyonu")
 
 if "messages" not in st.session_state:
-    st.session_state.messages = [{"role": "assistant", "content": "Sistem hazır. Taktik analizine başlayabiliriz."}]
+    st.session_state.messages = []
 
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
         st.markdown(message["content"])
 
-# --- SORU-CEVAP MEKANİZMASI ---
-if prompt := st.chat_input("Taktiksel analiz sorgusu..."):
+if prompt := st.chat_input("Taktiksel bir soru sorun (Örn: Fenerbahçe'nin sol kanat defans zafiyeti nedir?)"):
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
 
     with st.chat_message("assistant"):
-        msg_placeholder = st.empty()
-        
-        # 1. Pinecone Arama
-        soru_vektor = embeddings.embed_query(prompt)
-        search_results = pinecone_index.query(vector=soru_vektor, top_k=5, include_metadata=True)
-        context = "\n".join([res['metadata']['text'] for res in search_results['matches']])
-        
-        # 2. Prompt
-        full_prompt = f"Futbol analisti olarak cevapla.\n\nARŞİV: {context}\n\nSORU: {prompt}"
+        # 1. Pinecone'dan taktiksel 'öğretici' metinleri çek
+        query_vector = embeddings.embed_query(prompt)
+        results = pinecone_index.query(vector=query_vector, top_k=3, include_metadata=True)
+        taktik_context = "\n".join([res['metadata']['text'] for res in results['matches']])
 
-        try:
-            response = model.generate_content(full_prompt)
-            msg_placeholder.markdown(response.text)
-            st.session_state.messages.append({"role": "assistant", "content": response.text})
-        except Exception as e:
-            st.error(f"Hata: {e}")
+        # 2. Analizi Üret
+        with st.spinner("Analist verileri harmanlıyor..."):
+            res = generate_tactical_response(prompt, taktik_context)
+            full_response = res.text
+            
+            # Kaynakça (Citations) eklemesi
+            if res.candidates[0].grounding_metadata.search_entry_point:
+                full_response += "\n\n**🔍 Doğrulanmış Kaynaklar:** Google Search üzerinden güncel verilerle desteklenmiştir."
+            
+            st.markdown(full_response)
+            st.session_state.messages.append({"role": "assistant", "content": full_response})
