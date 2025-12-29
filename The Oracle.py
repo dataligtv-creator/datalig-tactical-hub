@@ -4,28 +4,15 @@ from google.genai import types
 from pinecone import Pinecone
 from langchain_community.embeddings import HuggingFaceEmbeddings
 import uuid
-import time
+from PIL import Image
+import io
 
-# --- 1. SAYFA AYARLARI ---
-st.set_page_config(page_title="DATALIG Oracle V4.0", page_icon="⚽", layout="wide")
+# --- 1. SİSTEM BAŞLATMA ---
+st.set_page_config(page_title="DATALIG Oracle V4.5", page_icon="⚽", layout="wide")
 
-# --- 2. 🔐 GİRİŞ KONTROLÜ ---
-if 'authenticated' not in st.session_state:
-    st.session_state.authenticated = False
-
-if not st.session_state.authenticated:
-    st.markdown("<h2 style='text-align:center;'>DATALIG COCKPIT</h2>", unsafe_allow_html=True)
-    pw = st.text_input("Şifre", type="password", key="login_pw")
-    if st.button("Sisteme Giriş"):
-        if pw == "datalig2025":
-            st.session_state.authenticated = True
-            st.rerun()
-        else: st.error("Erişim Reddedildi!")
-    st.stop()
-
-# --- 3. 🚀 SİSTEM BAŞLATMA ---
 @st.cache_resource
 def init_system():
+    # Gemini 2.5 Flash - Ücretsiz Kotaya Uygun ve Multimodal (Görsel okuyabilir)
     client = genai.Client(api_key=st.secrets["GOOGLE_API_KEY"])
     pc = Pinecone(api_key=st.secrets["PINECONE_API_KEY"])
     idx = pc.Index("regista-arsiv")
@@ -34,61 +21,79 @@ def init_system():
 
 try:
     client, pinecone_index, embeddings = init_system()
-    MODEL_ID = "gemini-2.5-flash" 
+    MODEL_ID = "gemini-2.5-flash"
 except Exception as e:
-    st.error(f"Sistem başlatılamadı: {e}")
+    st.error(f"Bağlantı Hatası: {e}")
     st.stop()
 
-# --- 4. 🌐 GLOBAL TAKTİK TARAYICI (SCOUT-AGENT) ---
-def scout_league_trends(league):
+# --- 2. 🧠 ANALİZ MOTORU (HİBRİT MANTIK) ---
+def get_combined_analysis(query, context, image=None):
+    """
+    Hem metin, hem arşiv, hem de (varsa) görseli birleştirip analiz eder.
+    """
     search_tool = types.Tool(google_search=types.GoogleSearch())
-    search_query = f"December 2025 {league} tactical analysis, latest team formations and coaching trends"
     
-    config = types.GenerateContentConfig(
-        tools=[search_tool],
-        system_instruction=f"Sen bir Global Taktik Analistisin. {league} ligindeki en güncel taktiksel değişimleri, antrenör tercihlerini ve dizilişleri profesyonel bir dille raporla."
-    )
-    
-    response = client.models.generate_content(model=MODEL_ID, contents=search_query, config=config)
-    return response.text
+    # Görsel varsa listeye ekle, yoksa sadece metin gönder
+    contents = [query]
+    if image:
+        contents.append(image)
 
-# --- 5. 🧠 ANA ANALİZ MOTORU ---
-def get_tactical_analysis(query, archive_data):
-    search_tool = types.Tool(google_search=types.GoogleSearch())
     config = types.GenerateContentConfig(
         tools=[search_tool],
         temperature=0.8,
         system_instruction=f"""
-        Sen Pro-Lisanslı bir futbol analistisin. 
-        SÜREÇ: 
-        1. Google Search ile son 3-4 maçın kadrosunu ve sakatlıkları doğrula.
-        2. Bilgiyi şu taktiksel veri tabanıyla harmanla: {archive_data}
-        3. Güncel lig trendlerini ve sakatlıkları baz alarak profesyonel bir TD raporu sun.
+        Sen Pro-Lisanslı bir 'Futbol Stratejisti'sin. 
+        ELİNDEKİ KAYNAKLAR:
+        1. ARŞİV VERİSİ: {context} (Taktiksel temel)
+        2. GÖRSEL VERİ: (Varsa) Isı haritası, xG tablosu veya diziliş görseli.
+        3. GÜNCEL VERİ: Google Search üzerinden son 3-4 maçın sakatlık/kadro bilgisi.
+
+        GÖREV: Görseldeki verileri (xG, ısı haritası, pas yüzdesi vb.) arşivdeki taktiksel 
+        prensiplerle harmanla. Eğer görsel bir ısı haritasıysa, oyuncunun saha içi 
+        geometrisini yorumla. Sakatlık durumlarını internetten teyit et.
         """
     )
-    response = client.models.generate_content(model=MODEL_ID, contents=query, config=config)
+
+    try:
+        response = client.models.generate_content(
+            model=MODEL_ID,
+            contents=contents,
+            config=config
+        )
+        return response.text
+    except Exception as e:
+        if "429" in str(e): return "KOTA_LIMITI"
+        return f"Hata: {str(e)}"
+
+# --- 3. 🌐 GLOBAL LİG TARAYICI ---
+def scout_league_trends(league):
+    search_tool = types.Tool(google_search=types.GoogleSearch())
+    config = types.GenerateContentConfig(
+        tools=[search_tool],
+        system_instruction=f"Sen bir Global Taktik Analistisin. {league} ligindeki en güncel 2025/26 taktiksel trendleri raporla."
+    )
+    response = client.models.generate_content(model=MODEL_ID, contents=f"{league} tactical review", config=config)
     return response.text
 
-# --- 6. 🖥️ ARAYÜZ ---
-st.markdown("### ⚽ DATALIG <span style='color:#94a3b8;'>ORACLE V4.0</span>", unsafe_allow_html=True)
+# --- 4. 🖥️ ARAYÜZ ---
+st.markdown("### ⚽ DATALIG <span style='color:#94a3b8;'>ORACLE V4.5</span>", unsafe_allow_html=True)
 
-# --- SIDEBAR: LİG ÖĞRETME MODÜLÜ ---
+# SIDEBAR: VERİ GİRİŞLERİ
 with st.sidebar:
+    st.markdown("### 📊 GÖRSEL VERİ ANALİZİ")
+    uploaded_file = st.file_uploader("Isı Haritası / xG Görseli Yükle", type=['png', 'jpg', 'jpeg'])
+    
+    st.markdown("---")
     st.markdown("### 🌐 GLOBAL ÖĞRENME")
     target_league = st.selectbox("Lig Seç", ["Premier League", "La Liga", "Serie A", "Bundesliga"])
-    if st.button(f"⚡ {target_league} Trendlerini Sisteme Öğret"):
-        with st.status(f"{target_league} Verileri İşleniyor...", expanded=True):
-            trend_report = scout_league_trends(target_league)
-            
-            # Pinecone'a Kaydet (Sistemin hafızasına ekle)
-            vec = embeddings.embed_query(trend_report)
-            vector_id = f"trend-{uuid.uuid4()}"
-            pinecone_index.upsert(vectors=[{"id": vector_id, "values": vec, "metadata": {"text": trend_report, "source": target_league}}])
-            
-            st.write(trend_report)
-            st.success("Taktiksel DNA başarıyla güncellendi!")
+    if st.button(f"⚡ {target_league} Trendlerini Öğret"):
+        with st.status(f"{target_league} Analiz Ediliyor..."):
+            report = scout_league_trends(target_league)
+            vec = embeddings.embed_query(report)
+            pinecone_index.upsert(vectors=[{"id": str(uuid.uuid4()), "values": vec, "metadata": {"text": report, "source": target_league}}])
+            st.success("DNA Güncellendi!")
 
-# --- ANA CHAT ---
+# ANA CHAT
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
@@ -96,17 +101,28 @@ for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
 
-if prompt := st.chat_input("Taktiksel sorunuz..."):
+if prompt := st.chat_input("Sorgunuzu yazın veya görsel yükleyin..."):
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
 
     with st.chat_message("assistant"):
-        with st.status("🔍 Hibrit Analiz Yapılıyor...", expanded=False):
+        with st.status("🔍 Analiz Ediliyor...", expanded=False):
+            # 1. Arşivden veri çek
             vec = embeddings.embed_query(prompt)
             res = pinecone_index.query(vector=vec, top_k=5, include_metadata=True)
             context = "\n".join([m['metadata']['text'] for m in res['matches']])
-            analysis = get_tactical_analysis(prompt, context)
+            
+            # 2. Görseli hazırla
+            image_data = None
+            if uploaded_file:
+                image_data = Image.open(uploaded_file)
+            
+            # 3. Hibrit Analiz
+            analysis = get_combined_analysis(prompt, context, image_data)
 
-        st.markdown(analysis)
-        st.session_state.messages.append({"role": "assistant", "content": analysis})
+        if analysis == "KOTA_LIMITI":
+            st.warning("⚠️ Kota doldu. 60 sn sonra tekrar deneyin.")
+        else:
+            st.markdown(analysis)
+            st.session_state.messages.append({"role": "assistant", "content": analysis})
