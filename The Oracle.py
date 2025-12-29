@@ -6,11 +6,7 @@ import time
 import uuid
 
 # --- SAYFA AYARLARI ---
-st.set_page_config(
-    page_title="DATALIG Pro Suite | Gemini 3",
-    page_icon="⚽",
-    layout="wide"
-)
+st.set_page_config(page_title="DATALIG Pro Suite", page_icon="⚽", layout="wide")
 
 # --- 🔐 GİRİŞ KONTROLÜ ---
 if 'authenticated' not in st.session_state:
@@ -23,52 +19,39 @@ def check_login():
         st.session_state.login_error = "Hatalı şifre teknik direktörüm!"
 
 if not st.session_state.authenticated:
-    # (Login arayüzü kodun aynı kalabilir, burayı hızlı geçiyorum)
+    st.markdown("<h2 style='text-align:center;'>DATALIG COCKPIT</h2>", unsafe_allow_html=True)
     st.text_input("Şifre", type="password", key="password", on_change=check_login)
     st.button("Giriş Yap", on_click=check_login)
     st.stop()
 
-# --- 🚀 API & MODEL YAPILANDIRMASI (ARALIK 2025) ---
+# --- 🚀 API & MODEL YAPILANDIRMASI (STABLE) ---
 if "GOOGLE_API_KEY" in st.secrets and "PINECONE_API_KEY" in st.secrets:
     genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
     
     @st.cache_resource
     def get_model():
-        # ARALIK 2025 GÜNCEL KODU: gemini-3-flash-preview
-        # Bu model üst düzey akıl yürütme ve multimodal yeteneklere sahiptir.
-        return genai.GenerativeModel(
-            model_name='gemini-3-flash-preview',
-            # Canlı internet verisiyle halüsinasyonu engelleyen Grounding aracı
-            tools=[{"google_search": {}}] 
-        )
+        # Şu anki en kararlı ve uyumlu model
+        return genai.GenerativeModel('gemini-2.5-flash')
     
     model = get_model()
 
     try:
         pc = Pinecone(api_key=st.secrets["PINECONE_API_KEY"])
         pinecone_index = pc.Index("regista-arsiv")
-        # Embedding modelini güncel tutuyoruz
         embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
-        db_status, db_color = "ONLINE (GEMINI 3 READY)", "#00e5ff"
+        db_status = "SYSTEM ONLINE"
     except Exception:
-        db_status, db_color = "OFFLINE", "#ef4444"
+        db_status = "DB OFFLINE"
 else:
     st.error("🚨 API KEY EKSİK!")
     st.stop()
 
-# --- SIDEBAR & SİSTEMİ EĞİT (Aynen Kalabilir) ---
-with st.sidebar:
-    st.markdown(f"**SİSTEM DURUMU:** <span style='color:{db_color}'>{db_status}</span>", unsafe_allow_html=True)
-    if st.button("🔒 Çıkış Yap"):
-        st.session_state.authenticated = False
-        st.rerun()
-
 # --- ANA EKRAN ---
-st.markdown("### ⚽ DATALIG <span style='color:#94a3b8;'>ORACLE V3.0 (Gemini 3 Flash)</span>", unsafe_allow_html=True)
-st.markdown("---")
+st.sidebar.markdown(f"**DURUM:** {db_status}")
+st.markdown("### ⚽ DATALIG ORACLE V2.6")
 
 if "messages" not in st.session_state:
-    st.session_state.messages = [{"role": "assistant", "content": "Sistem Gemini 3 Flash ile güncellendi hocam. Taktik tahtası emrinizde."}]
+    st.session_state.messages = [{"role": "assistant", "content": "Sistem hazır. Taktik analizine başlayabiliriz."}]
 
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
@@ -83,30 +66,17 @@ if prompt := st.chat_input("Taktiksel analiz sorgusu..."):
     with st.chat_message("assistant"):
         msg_placeholder = st.empty()
         
-        with st.status("⚡ DERİN AKIL YÜRÜTME AKTİF...", expanded=False):
-            # 1. Pinecone'dan Arşiv Verisini Çek
-            soru_vektor = embeddings.embed_query(prompt)
-            search_results = pinecone_index.query(vector=soru_vektor, top_k=10, include_metadata=True)
-            context = "\n".join([res['metadata']['text'] for res in search_results['matches']])
-            
-            # 2. Gemini 3 İçin Gelişmiş Prompt
-            # 'thinking' (düşünme) özelliğini tetikleyen yapı
-            full_prompt = f"""
-            TALİMAT: Sen profesyonel futbol analisti 'DATALIG AI'sın. 
-            ARŞİV BİLGİLERİ (Pinecone): {context if context else "Özel veri yok."}
-            
-            GÖREV: Yukarıdaki arşiv bilgilerini, kendi futbol bilginle ve Google Search üzerinden gelen 
-            güncel dünya verileriyle (sakatlıklar, form durumu) birleştirerek derin bir analiz yap.
-            
-            SORU: {prompt}
-            """
+        # 1. Pinecone Arama
+        soru_vektor = embeddings.embed_query(prompt)
+        search_results = pinecone_index.query(vector=soru_vektor, top_k=5, include_metadata=True)
+        context = "\n".join([res['metadata']['text'] for res in search_results['matches']])
+        
+        # 2. Prompt
+        full_prompt = f"Futbol analisti olarak cevapla.\n\nARŞİV: {context}\n\nSORU: {prompt}"
 
         try:
-            # Gemini 3 Flash üretimi
             response = model.generate_content(full_prompt)
-            ai_response = response.text
-            
-            msg_placeholder.markdown(ai_response)
-            st.session_state.messages.append({"role": "assistant", "content": ai_response})
+            msg_placeholder.markdown(response.text)
+            st.session_state.messages.append({"role": "assistant", "content": response.text})
         except Exception as e:
-            st.error(f"Sistem Hatası: {e}. Lütfen model ismini kontrol edin.")
+            st.error(f"Hata: {e}")
