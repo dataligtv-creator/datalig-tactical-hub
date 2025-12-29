@@ -3,6 +3,19 @@ import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
 
+# --- 🛰️ ORACLE BAĞLANTISI ---
+context = st.session_state.get('tactic_context', {})
+active_team = context.get('focus_team', 'Genel')
+active_formation = context.get('formation', 'Bilinmiyor')
+
+st.markdown(f"## 🧬 SCOUT DNA: {active_team}")
+
+if active_team != 'Genel':
+    st.success(f"🎯 Oracle Odak Noktası: **{active_team}** takımı için **{active_formation}** analizi yapılıyor.")
+    # Burada internetten veya veri tabanından 'active_team'e göre oyuncuları getiriyoruz
+    # Örn: get_players_by_team(active_team)
+else:
+    st.info("💡 Oracle sayfasında bir taktik konuşarak burayı otomatize edebilirsiniz.")
 # --- SAYFA AYARLARI ---
 st.set_page_config(page_title="Scout DNA Pro | DATALIG", page_icon="🧬", layout="wide")
 
