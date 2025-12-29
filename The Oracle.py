@@ -38,30 +38,31 @@ except Exception as e:
 def get_manager_analysis(query, archive_context):
     search_tool = types.Tool(google_search=types.GoogleSearch())
     
+    # Bugünün tarihini modele açıkça belirtiyoruz
+    current_date = "29 Aralık 2025"
+    
     config = types.GenerateContentConfig(
         tools=[search_tool],
-        temperature=1.0, # Güncel veriyi yorumlaması için esneklik sağladık
+        temperature=1.0,
         system_instruction=f"""
-        Sen 'DATALIG Football OS' sisteminin Baş Stratejistisin. 
+        BUGÜNÜN TARİHİ: {current_date}
+        Sen 'DATALIG Football OS' Baş Stratejistisin. 
         
-        KRİTİK TALİMATLAR:
-        1. 'Bilmiyorum' veya 'Arşivimde yok' demek KESİNLİKE YASAKTIR.
-        2. Eğer bir bilgi (örn: Fenerbahçe'nin güncel durumu) arşivinde ({archive_context}) yoksa, 
-           DERHAL Google Search kullanarak WhoScored, FBref ve haber kaynaklarını tara.
-        3. Aralık 2025 itibarıyla güncel kadroyu, sakatlıkları ve son maç dizilişlerini öğren.
-        4. Taktiksel yorumunu yaparken arşivdeki Premier Lig/La Liga standartlarını bir IQ katmanı olarak kullan.
-        
-        YANIT FORMATI:
-        - ANALİZ: İnternet verileriyle güncel durum teşhisi.
-        - TAKTİKSEL REÇETE: Arşivdeki elit taktiklerle harmanlanmış çözüm.
-        - ODAK GÜNCELLEMESİ: Cevabın sonunda mutlaka [TEAM: ..., FORMATION: ...] bilgisini ver.
+        KESİN TALİMATLAR:
+        1. GEÇMİŞ VERİ YASAĞI: Mourinho dönemi gibi eski bilgileri 'tarihsel bilgi' olarak sakla ancak GÜNCEL analizde kullanma. 
+        2. ZAMAN ODAĞI: Sadece son 3 aya (Ekim-Aralık 2025) ait WhoScored, Transfermarkt ve FBref verilerine odaklan.
+        3. OYUNCU TESPİTİ: Fenerbahçe'nin güncel sol bek opsiyonlarını (Örn: Archie Brown, Filip Kostić, Levent Mercan vb.) internetten teyit et.
+        4. ARCHIE BROWN ANALİZİ: Eğer Archie Brown kadroya dahil edildiyse veya gündemdeyse, onun Gent dönemindeki istatistiklerini bugünkü Fenerbahçe sistemiyle kıyasla.
+        5. ARŞİV KIYASI: Bulduğun bu GÜNCEL verileri, arşivindeki ({archive_context}) Premier Lig sol bek standartlarıyla (Geçiş savunması, bindirme hızı) harmanla.
         """
     )
 
     try:
+        # Arama sorgusuna tarihi ekleyerek zorluyoruz
+        forced_query = f"{current_date} itibarıyla {query}"
         response = client.models.generate_content(
             model=MODEL_ID,
-            contents=[query],
+            contents=[forced_query],
             config=config
         )
         return response.text
