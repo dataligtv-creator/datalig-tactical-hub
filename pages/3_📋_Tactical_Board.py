@@ -13,18 +13,41 @@ oracle_raporu = tactic_focus.get('scouting_report', "Oracle sayfasında henüz b
 st.set_page_config(page_title="War Room | DATALIG", page_icon="📋", layout="wide")
 
 # --- CSS ---
+# --- CSS GÜNCELLEMESİ (Bunu CSS kısmına ekle) ---
 st.markdown("""
 <style>
-    .stApp { background-color: #0b0f19; }
-    h1, h2, h3 { color: white !important; font-family: 'monospace'; }
-    .stButton button { background-color: #00e5ff !important; color: #0b0f19 !important; font-weight: bold; }
-    .report-box { background-color: rgba(30, 41, 59, 0.4); padding: 20px; border-left: 4px solid #ff0055; border-radius: 8px; margin-top: 20px; min-height: 200px; }
-    .oracle-box { background-color: rgba(0, 229, 255, 0.05); border-left: 4px solid #00e5ff; padding: 15px; border-radius: 5px; color: #e2e8f0; font-size: 14px; }
+    /* Kaydırılabilir ve daha şık Oracle kutusu */
+    .oracle-scroll-box {
+        background-color: rgba(0, 229, 255, 0.05);
+        border-left: 4px solid #00e5ff;
+        padding: 15px;
+        border-radius: 8px;
+        color: #e2e8f0;
+        font-size: 13px;
+        height: 300px; /* Sabit yükseklik */
+        overflow-y: auto; /* Aşağı kaydırma özelliği */
+        line-height: 1.6;
+    }
+    /* Kaydırma çubuğunu özelleştirme */
+    .oracle-scroll-box::-webkit-scrollbar { width: 5px; }
+    .oracle-scroll-box::-webkit-scrollbar-thumb { background: #00e5ff; border-radius: 10px; }
 </style>
 """, unsafe_allow_html=True)
 
-st.title("📋 THE WAR ROOM")
-st.caption("Oracle Destekli Stratejik Planlama")
+# --- SOL PANEL (SOL SÜTUN İÇİ) ---
+with col_sidebar:
+    st.markdown(f"### 🛡️ ANALİZ ODAĞI: <span style='color:#ff0055;'>{aktif_takim}</span>", unsafe_allow_html=True)
+    
+    # ... (Diziliş ve Taktiği Onayla butonu kısımları aynı kalsın) ...
+
+    st.markdown("---")
+    st.markdown("#### 🧠 STRATEJİK ÖZET")
+    
+    # Raporu daha temiz hale getirip kaydırılabilir kutuya koyuyoruz
+    clean_report = oracle_raporu.replace("**", "").replace("###", "")
+    st.markdown(f'<div class="oracle-scroll-box">{clean_report}</div>', unsafe_allow_html=True)
+    
+    st.caption("Not: Detaylar için Oracle sayfasına göz atın.")
 st.markdown("---")
 
 # --- ANA PANEL ---
