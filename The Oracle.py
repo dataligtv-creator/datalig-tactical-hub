@@ -98,4 +98,55 @@ for msg in st.session_state.messages:
 
 # --- ⚡ HIZLI KOMUT ŞABLONLARI ---
 st.markdown("---")
-st.markdown("<p style='font-size: 12px; color: #94a
+st.markdown("<p style='font-size: 12px; color: #94a3b8; font-weight: bold;'>⚡ TAKTİKSEL ŞABLONLAR</p>", unsafe_allow_html=True)
+col_t1, col_t2, col_t3, col_t4 = st.columns(4)
+
+templates = {
+    "🔍 Rakip Gözlemi": "Aktif takımı (veya en son konuşulan takımı) analiz et. Son 3 maçına bakarak en zayıf savunma halkasını ve kilit hücum oyuncusunu WhoScored verileriyle raporla.",
+    "🛡️ Savunma Reçetesi": "Bu takıma karşı xG üretimini düşürmek için Premier Lig standartlarında bir savunma bloğu ve pres tetikleyicisi (press triggers) öner.",
+    "📈 Transfer Uyumu": "Gündemdeki oyuncunun (Örn: Archie Brown) mevcut taktiksel sistemimize (4-3-3) uyumunu FBref istatistikleriyle kıyasla.",
+    "🏟️ Maç Sonu xG": "Son oynanan maçın xG (Gol Beklentisi) verilerini tara. Üretilen fırsatların kalitesini ve taktiksel yerleşim hatalarını analiz et."
+}
+
+def handle_template(prompt_text):
+    st.session_state.messages.append({"role": "user", "content": prompt_text})
+    st.rerun()
+
+with col_t1:
+    if st.button("🔍 Rakip Gözlemi", use_container_width=True): handle_template(templates["🔍 Rakip Gözlemi"])
+with col_t2:
+    if st.button("🛡️ Savunma Reçetesi", use_container_width=True): handle_template(templates["🛡️ Savunma Reçetesi"])
+with col_t3:
+    if st.button("📈 Transfer Uyumu", use_container_width=True): handle_template(templates["📈 Transfer Uyumu"])
+with col_t4:
+    if st.button("🏟️ Maç Sonu xG", use_container_width=True): handle_template(templates["🏟️ Maç Sonu xG"])
+
+# --- KULLANICI GİRİŞİ ---
+if prompt := st.chat_input("Taktiksel sorgunuzu girin..."):
+    st.session_state.messages.append({"role": "user", "content": prompt})
+    st.rerun()
+
+# Yanıt Üretme Mantığı
+if st.session_state.messages and st.session_state.messages[-1]["role"] == "user":
+    last_prompt = st.session_state.messages[-1]["content"]
+    with st.chat_message("assistant"):
+        with st.status("🔍 Veriler İşleniyor...", expanded=False):
+            vec = embeddings.embed_query(last_prompt)
+            res = pinecone_index.query(vector=vec, top_k=3, include_metadata=True)
+            archive = "\n".join([m['metadata']['text'] for m in res['matches']])
+            analysis = get_manager_analysis(last_prompt, archive)
+
+        if analysis == "KOTA_LIMITI":
+            st.warning("⚠️ Kota doldu. 60sn bekleyin.")
+        else:
+            st.markdown(analysis)
+            st.session_state.messages.append({"role": "assistant", "content": analysis})
+            
+            # Bağlam Güncelleme
+            if "Fenerbahçe" in analysis or "Fenerbahçe" in last_prompt: st.session_state.tactic_context['focus_team'] = "Fenerbahçe"
+            for f in ["4-3-3", "4-2-3-1", "3-5-2", "4-4-2"]:
+                if f in analysis or f in last_prompt: st.session_state.tactic_context['formation'] = f
+            
+            st.session_state.tactic_context['scouting_report'] = analysis
+            st.toast(f"Odak: {st.session_state.tactic_context['focus_team']}")
+            st.rerun()
