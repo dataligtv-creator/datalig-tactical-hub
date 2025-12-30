@@ -24,7 +24,7 @@ if 'authenticated' not in st.session_state:
 # --- 3. GİRİŞ KONTROLÜ ---
 if not st.session_state.authenticated:
     st.markdown("<h1 style='text-align:center; color:#00E5FF; font-family:monospace;'>DATALIG COCKPIT</h1>", unsafe_allow_html=True)
-    pw = st.text_input("Sistem Şifresi", type="password")
+    pw = st.text_input("Sistem Şifresi", type="password", key="login_key")
     if st.button("ERİŞİM SAĞLA"):
         if pw == "datalig2025":
             st.session_state.authenticated = True
@@ -34,11 +34,15 @@ if not st.session_state.authenticated:
 # --- 4. SİSTEM BAŞLATMA ---
 @st.cache_resource
 def init_system():
-    client = genai.Client(api_key=st.secrets["GOOGLE_API_KEY"])
-    pc = Pinecone(api_key=st.secrets["PINECONE_API_KEY"])
-    idx = pc.Index("regista-arsiv")
-    embeds = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
-    return client, idx, embeds
+    try:
+        client = genai.Client(api_key=st.secrets["GOOGLE_API_KEY"])
+        pc = Pinecone(api_key=st.secrets["PINECONE_API_KEY"])
+        idx = pc.Index("regista-arsiv")
+        embeds = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+        return client, idx, embeds
+    except Exception as e:
+        st.error(f"Başlatma Hatası: {e}")
+        return None, None, None
 
 client, pinecone_index, embeddings = init_system()
 
@@ -48,23 +52,23 @@ def get_manager_analysis(query, archive_context):
     current_date = "30 Aralık 2025" 
     config = types.GenerateContentConfig(
         tools=[search_tool], temperature=1.0,
-        system_instruction=f"Tarih: {current_date}. Sen DATALIG Football OS Baş Stratejistisin. WhoScored ve FBref verilerini tara. Yanıtın sonunda mutlaka [TEAM: ..., FORMATION: ...] bilgisini ver."
+        system_instruction=f"Tarih: {current_date}. Sen DATALIG Football OS Baş Stratejistisin. Yanıtın sonunda mutlaka [TEAM: ..., FORMATION: ...] bilgisini ver."
     )
     response = client.models.generate_content(model="gemini-2.5-flash", contents=[f"{current_date} verisiyle: {query}"], config=config)
     return response.text
 
-# --- 6. 🚀 STITCH UI: CYBER-PITCH ENGINE ---
+# --- 6. 🚀 STITCH UI: CYBER-PITCH ENGINE (V6.2) ---
 def render_cyber_ui(context):
     clean_report = context['scouting_report'].replace("\n", "<br>").replace("**", "")
     formation = context['formation']
     
-    # --- DİKEY SAHA POZİSYONLARI (Alt Kale: Savunma, Üst Kale: Hücum) ---
+    # Dikey Saha Piyon Pozisyonları
     pos_db = {
         "4-3-3": [
-            {"t": "92%", "l": "50%", "i": "shield"}, # Kaleci (Alt)
-            {"t": "80%", "l": "20%"}, {"t": "82%", "l": "40%"}, {"t": "82%", "l": "60%"}, {"t": "80%", "l": "80%"}, # Defans
-            {"t": "60%", "l": "30%"}, {"t": "65%", "l": "50%"}, {"t": "60%", "l": "70%"}, # Orta Saha
-            {"t": "35%", "l": "20%"}, {"t": "28%", "l": "50%"}, {"t": "35%", "l": "80%"}  # Hücum (Üst)
+            {"t": "92%", "l": "50%", "i": "shield"},
+            {"t": "80%", "l": "20%"}, {"t": "82%", "l": "40%"}, {"t": "82%", "l": "60%"}, {"t": "80%", "l": "80%"},
+            {"t": "60%", "l": "30%"}, {"t": "65%", "l": "50%"}, {"t": "60%", "l": "70%"},
+            {"t": "35%", "l": "20%"}, {"t": "28%", "l": "50%"}, {"t": "35%", "l": "80%"}
         ],
         "4-2-3-1": [
             {"t": "92%", "l": "50%", "i": "shield"},
@@ -83,77 +87,96 @@ def render_cyber_ui(context):
     
     players = pos_db.get(formation, pos_db["4-3-3"])
     player_html = "".join([f"""
-        <div class="absolute" style="top: {p['t']}; left: {p['l']}; transform: translate(-50%, -50%);">
-            <div class="w-7 h-7 rounded-full border border-cyan-400 bg-slate-950 flex items-center justify-center shadow-[0_0_8px_rgba(0,229,255,0.6)]">
-                <span class="material-icons-outlined text-cyan-400" style="font-size: 14px;">{p.get('i', 'person')}</span>
+        <div style="position: absolute; top: {p['t']}; left: {p['l']}; transform: translate(-50%, -50%); z-index: 10;">
+            <div style="width: 28px; height: 28px; border-radius: 50%; border: 1px solid #00E5FF; background: #0B0E14; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 10px rgba(0,229,255,0.5);">
+                <span class="material-icons-outlined" style="color: #00E5FF; font-size: 16px;">{p.get('i', 'person')}</span>
             </div>
         </div>
     """ for p in players])
 
+    # HTML Şablonu (F-string çakışmasını önlemek için {{ }} kullanıldı)
     html_code = f"""
     <!DOCTYPE html>
-    <html class="dark">
+    <html>
     <head>
         <script src="https://cdn.tailwindcss.com"></script>
-        <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@600&family=Share+Tech+Mono&display=swap" rel="stylesheet"/>
-        <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet"/>
+        <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@600&display=swap" rel="stylesheet">
+        <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
         <style>
-            body {{ background-color: #0B0E14; color: #cbd5e1; font-family: 'Rajdhani', sans-serif; overflow: hidden; }}
-            .glass-panel {{ background: rgba(19, 27, 38, 0.85); backdrop-filter: blur(10px); border: 1px solid rgba(0, 229, 255, 0.15); }}
-            .cyber-pitch {{ 
-                background: #0B0E14;
-                position: relative;
-                background-image: radial-gradient(circle, #1e2937 1px, transparent 1px);
-                background-size: 25px 25px;
-                border: 1px solid #1e293b;
-            }}
+            body {{ background-color: #0B0E14; color: #cbd5e1; font-family: 'Rajdhani', sans-serif; margin: 0; padding: 10px; overflow: hidden; }}
+            .glass-panel {{ background: rgba(19, 27, 38, 0.85); backdrop-filter: blur(10px); border: 1px solid rgba(0, 229, 255, 0.15); border-radius: 8px; }}
+            .cyber-pitch {{ background: #0B0E14; position: relative; border: 1px solid #1e293b; border-radius: 8px; height: 100%; overflow: hidden; }}
+            .pitch-lines {{ position: absolute; inset: 20px; border: 1px solid rgba(255,255,255,0.05); }}
         </style>
     </head>
-    <body class="p-2">
-        <header class="flex justify-between items-center mb-4 px-2">
-            <div class="flex items-center gap-3">
-                <div class="w-9 h-9 border border-cyan-500 flex items-center justify-center rounded bg-slate-900">
-                    <span class="material-icons-outlined text-cyan-500">radar</span>
-                </div>
-                <h1 class="text-xl font-bold tracking-widest text-white uppercase">Datalig <span class="text-cyan-400">OS</span></h1>
+    <body>
+        <header style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <span class="material-icons-outlined" style="color: #00E5FF;">radar</span>
+                <span style="font-weight: bold; letter-spacing: 2px; color: white;">DATALIG OS</span>
             </div>
-            <div class="flex gap-4">
-                <div class="glass-panel px-5 py-1 border-b border-red-500 text-[10px] tracking-widest uppercase">Target: {context['focus_team']}</div>
-                <div class="glass-panel px-5 py-1 border-b border-cyan-500 text-[10px] tracking-widest uppercase text-cyan-400">System: {formation}</div>
+            <div style="display: flex; gap: 10px;">
+                <div class="glass-panel" style="padding: 2px 15px; border-bottom: 2px solid #ef4444; font-size: 10px;">{context['focus_team']}</div>
+                <div class="glass-panel" style="padding: 2px 15px; border-bottom: 2px solid #00E5FF; font-size: 10px; color: #00E5FF;">{formation}</div>
             </div>
         </header>
 
-        <main class="grid grid-cols-12 gap-4 h-[520px]">
-            <div class="col-span-3 glass-panel p-4 rounded-lg flex flex-col">
-                <div class="flex items-center gap-2 mb-3 border-b border-slate-700 pb-2">
-                    <span class="material-icons-outlined text-cyan-400 text-sm">sensors</span>
-                    <h4 class="text-cyan-400 text-[10px] uppercase tracking-widest font-mono">Scouting Feed</h4>
-                </div>
-                <div class="flex-1 overflow-y-auto font-mono text-[10px] leading-relaxed text-slate-400 pr-2">
-                    {clean_report}
-                </div>
+        <div style="display: grid; grid-template-columns: repeat(12, 1fr); gap: 15px; height: 480px;">
+            <div class="glass-panel" style="grid-column: span 3; padding: 15px; display: flex; flex-direction: column;">
+                <div style="font-size: 10px; color: #00E5FF; border-bottom: 1px solid #1e293b; padding-bottom: 5px; margin-bottom: 10px; letter-spacing: 1px;">INTELLIGENCE FEED</div>
+                <div style="flex: 1; overflow-y: auto; font-family: monospace; font-size: 10px; color: #94a3b8; line-height: 1.5;">{clean_report}</div>
             </div>
-
-            <div class="col-span-9 cyber-pitch rounded-lg overflow-hidden border border-slate-700">
-                <div class="absolute inset-x-12 inset-y-6 border border-white/10">
-                    <div class="absolute top-1/2 left-0 right-0 h-[1px] bg-white/10"></div>
-                    <div class="absolute top-1/2 left-1/2 w-28 h-28 border border-white/10 rounded-full -translate-x-1/2 -translate-y-1/2"></div>
-                    
-                    <div class="absolute top-0 left-1/2 -translate-x-1/2 w-48 h-20 border-b border-x border-white/10"></div>
-                    <div class="absolute -top-1 left-1/2 -translate-x-1/2 w-20 h-2 bg-cyan-500/20 border border-cyan-500/50"></div>
-                    
-                    <div class="absolute bottom-0 left-1/2 -translate-x-1/2 w-48 h-20 border-t border-x border-white/10"></div>
-                    <div class="absolute -bottom-1 left-1/2 -translate-x-1/2 w-20 h-2 bg-red-500/20 border border-red-500/50"></div>
+            
+            <div class="cyber-pitch" style="grid-column: span 9;">
+                <div class="pitch-lines">
+                    <div style="position: absolute; top: 50%; left: 0; right: 0; h: 1px; background: rgba(255,255,255,0.1);"></div>
+                    <div style="position: absolute; top: 50%; left: 50%; width: 100px; height: 100px; border: 1px solid rgba(255,255,255,0.1); border-radius: 50%; transform: translate(-50%, -50%);"></div>
+                    <div style="position: absolute; top: 0; left: 50%; width: 140px; height: 60px; border: 1px solid rgba(255,255,255,0.1); border-top: 0; transform: translateX(-50%);"></div>
+                    <div style="position: absolute; bottom: 0; left: 50%; width: 140px; height: 60px; border: 1px solid rgba(255,255,255,0.1); border-bottom: 0; transform: translateX(-50%);"></div>
+                    <div style="position: absolute; top: 0; left: 50%; width: 60px; height: 4px; background: rgba(0,229,255,0.3); transform: translateX(-50%); border-radius: 0 0 4px 4px;"></div>
+                    <div style="position: absolute; bottom: 0; left: 50%; width: 60px; height: 4px; background: rgba(239,68,68,0.3); transform: translateX(-50%); border-radius: 4px 4px 0 0;"></div>
                 </div>
-                
                 {player_html}
-
-                <div class="absolute bottom-2 right-4 text-[8px] font-mono text-slate-600 uppercase">
-                    Tactical Engine V6.2 // Vertical Matrix
-                </div>
             </div>
-        </main>
+        </div>
     </body>
     </html>
     """
-    return components.html(html_code, height=600)
+    return components.html(html_code, height=580)
+
+# --- 7. ANA ARAYÜZ ---
+render_cyber_ui(st.session_state.tactic_context)
+
+st.markdown("---")
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+
+# Mesajları göster
+for msg in st.session_state.messages[-3:]:
+    with st.chat_message(msg["role"]):
+        st.markdown(msg["content"])
+
+# Giriş
+if prompt := st.chat_input("Taktiksel komut bekliyorum..."):
+    st.session_state.messages.append({"role": "user", "content": prompt})
+    
+    with st.chat_message("assistant"):
+        with st.status("🔍 Analiz Ediliyor...", expanded=False):
+            vec = embeddings.embed_query(prompt)
+            res = pinecone_index.query(vector=vec, top_k=3, include_metadata=True)
+            archive = "\n".join([m['metadata']['text'] for m in res['matches']])
+            ans = get_manager_analysis(prompt, archive)
+        
+        st.markdown(ans)
+        st.session_state.messages.append({"role": "assistant", "content": ans})
+        
+        # Bağlam Güncelleme
+        if "Fenerbahçe" in ans or "Fenerbahçe" in prompt: st.session_state.tactic_context['focus_team'] = "FENERBAHÇE"
+        elif "Galatasaray" in ans: st.session_state.tactic_context['focus_team'] = "GALATASARAY"
+        
+        for f in ["4-3-3", "4-2-3-1", "3-5-2", "4-4-2"]:
+            if f in ans or f in prompt: st.session_state.tactic_context['formation'] = f
+            
+        st.session_state.tactic_context['scouting_report'] = ans
+        st.session_state.tactic_context['last_update'] = time.time()
+        st.rerun()
