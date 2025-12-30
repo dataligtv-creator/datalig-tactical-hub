@@ -58,26 +58,26 @@ def render_cyber_ui(context):
     clean_report = context['scouting_report'].replace("\n", "<br>").replace("**", "")
     formation = context['formation']
     
-    # Dizilişe Göre Dinamik Piyon Pozisyonları
+    # --- DİKEY SAHA POZİSYONLARI (Alt Kale: Savunma, Üst Kale: Hücum) ---
     pos_db = {
         "4-3-3": [
-            {"t": "92%", "l": "50%", "i": "shield"}, # GK
-            {"t": "78%", "l": "15%"}, {"t": "80%", "l": "38%"}, {"t": "80%", "l": "62%"}, {"t": "78%", "l": "85%"}, # DEF
-            {"t": "55%", "l": "30%"}, {"t": "60%", "l": "50%"}, {"t": "55%", "l": "70%"}, # MID
-            {"t": "30%", "l": "20%"}, {"t": "25%", "l": "50%"}, {"t": "30%", "l": "80%"}  # FWD
+            {"t": "92%", "l": "50%", "i": "shield"}, # Kaleci (Alt)
+            {"t": "80%", "l": "20%"}, {"t": "82%", "l": "40%"}, {"t": "82%", "l": "60%"}, {"t": "80%", "l": "80%"}, # Defans
+            {"t": "60%", "l": "30%"}, {"t": "65%", "l": "50%"}, {"t": "60%", "l": "70%"}, # Orta Saha
+            {"t": "35%", "l": "20%"}, {"t": "28%", "l": "50%"}, {"t": "35%", "l": "80%"}  # Hücum (Üst)
         ],
         "4-2-3-1": [
             {"t": "92%", "l": "50%", "i": "shield"},
-            {"t": "78%", "l": "12%"}, {"t": "80%", "l": "35%"}, {"t": "80%", "l": "65%"}, {"t": "78%", "l": "88%"},
-            {"t": "65%", "l": "40%"}, {"t": "65%", "l": "60%"},
-            {"t": "45%", "l": "20%"}, {"t": "40%", "l": "50%"}, {"t": "45%", "l": "80%"},
-            {"t": "20%", "l": "50%"}
+            {"t": "80%", "l": "15%"}, {"t": "82%", "l": "38%"}, {"t": "82%", "l": "62%"}, {"t": "80%", "l": "85%"},
+            {"t": "68%", "l": "40%"}, {"t": "68%", "l": "60%"},
+            {"t": "48%", "l": "20%"}, {"t": "45%", "l": "50%"}, {"t": "48%", "l": "80%"},
+            {"t": "25%", "l": "50%"}
         ],
         "3-5-2": [
              {"t": "92%", "l": "50%", "i": "shield"},
-             {"t": "80%", "l": "25%"}, {"t": "82%", "l": "50%"}, {"t": "80%", "l": "75%"},
-             {"t": "55%", "l": "10%"}, {"t": "50%", "l": "35%"}, {"t": "52%", "l": "50%"}, {"t": "50%", "l": "65%"}, {"t": "55%", "l": "90%"},
-             {"t": "25%", "l": "40%"}, {"t": "25%", "l": "60%"}
+             {"t": "82%", "l": "25%"}, {"t": "84%", "l": "50%"}, {"t": "82%", "l": "75%"},
+             {"t": "60%", "l": "10%"}, {"t": "58%", "l": "35%"}, {"t": "58%", "l": "50%"}, {"t": "58%", "l": "65%"}, {"t": "60%", "l": "90%"},
+             {"t": "30%", "l": "40%"}, {"t": "30%", "l": "60%"}
         ]
     }
     
@@ -107,23 +107,18 @@ def render_cyber_ui(context):
                 background-size: 25px 25px;
                 border: 1px solid #1e293b;
             }}
-            .scan-line {{
-                position: absolute; width: 100%; h-1px; background: linear-gradient(90deg, transparent, #00e5ff, transparent);
-                opacity: 0.3; animation: scan 4s linear infinite;
-            }}
-            @keyframes scan {{ 0% {{ top: 0%; }} 100% {{ top: 100%; }} }}
         </style>
     </head>
     <body class="p-2">
         <header class="flex justify-between items-center mb-4 px-2">
             <div class="flex items-center gap-3">
-                <div class="w-9 h-9 border border-red-500 flex items-center justify-center rounded bg-slate-900 shadow-[0_0_10px_rgba(255,0,0,0.2)]">
-                    <span class="material-icons-outlined text-red-500">terminal</span>
+                <div class="w-9 h-9 border border-cyan-500 flex items-center justify-center rounded bg-slate-900">
+                    <span class="material-icons-outlined text-cyan-500">radar</span>
                 </div>
-                <h1 class="text-xl font-bold tracking-widest text-white uppercase">Datalig <span class="text-cyan-400 italic">OS</span></h1>
+                <h1 class="text-xl font-bold tracking-widest text-white uppercase">Datalig <span class="text-cyan-400">OS</span></h1>
             </div>
             <div class="flex gap-4">
-                <div class="glass-panel px-5 py-1 border-b border-red-500 text-[10px] tracking-widest uppercase">Target: <span class="text-white">{context['focus_team']}</span></div>
+                <div class="glass-panel px-5 py-1 border-b border-red-500 text-[10px] tracking-widest uppercase">Target: {context['focus_team']}</div>
                 <div class="glass-panel px-5 py-1 border-b border-cyan-500 text-[10px] tracking-widest uppercase text-cyan-400">System: {formation}</div>
             </div>
         </header>
@@ -139,19 +134,22 @@ def render_cyber_ui(context):
                 </div>
             </div>
 
-            <div class="col-span-9 cyber-pitch rounded-lg overflow-hidden">
-                <div class="scan-line"></div>
-                <div class="absolute inset-6 border border-white/5">
+            <div class="col-span-9 cyber-pitch rounded-lg overflow-hidden border border-slate-700">
+                <div class="absolute inset-x-12 inset-y-6 border border-white/10">
                     <div class="absolute top-1/2 left-0 right-0 h-[1px] bg-white/10"></div>
                     <div class="absolute top-1/2 left-1/2 w-28 h-28 border border-white/10 rounded-full -translate-x-1/2 -translate-y-1/2"></div>
-                    <div class="absolute top-0 left-1/2 -translate-x-1/2 w-40 h-16 border-b border-x border-white/10"></div>
-                    <div class="absolute bottom-0 left-1/2 -translate-x-1/2 w-40 h-16 border-t border-x border-white/10"></div>
+                    
+                    <div class="absolute top-0 left-1/2 -translate-x-1/2 w-48 h-20 border-b border-x border-white/10"></div>
+                    <div class="absolute -top-1 left-1/2 -translate-x-1/2 w-20 h-2 bg-cyan-500/20 border border-cyan-500/50"></div>
+                    
+                    <div class="absolute bottom-0 left-1/2 -translate-x-1/2 w-48 h-20 border-t border-x border-white/10"></div>
+                    <div class="absolute -bottom-1 left-1/2 -translate-x-1/2 w-20 h-2 bg-red-500/20 border border-red-500/50"></div>
                 </div>
                 
                 {player_html}
 
-                <div class="absolute bottom-4 right-4 text-[9px] font-mono text-slate-600 tracking-widest">
-                    DATALIG // TACTICAL_CORE_V6.1
+                <div class="absolute bottom-2 right-4 text-[8px] font-mono text-slate-600 uppercase">
+                    Tactical Engine V6.2 // Vertical Matrix
                 </div>
             </div>
         </main>
@@ -159,40 +157,3 @@ def render_cyber_ui(context):
     </html>
     """
     return components.html(html_code, height=600)
-
-# --- 7. ANA ARAYÜZ ---
-# Dashboard'u render et
-render_cyber_ui(st.session_state.tactic_context)
-
-# Chat Alanı
-st.markdown("---")
-if "messages" not in st.session_state: st.session_state.messages = []
-
-# Mesaj Akışı (Sadece son 3 mesaj)
-for msg in st.session_state.messages[-3:]:
-    with st.chat_message(msg["role"]): st.markdown(msg["content"])
-
-# Giriş ve Analiz
-if prompt := st.chat_input("Taktiksel komut beklemede..."):
-    st.session_state.messages.append({"role": "user", "content": prompt})
-    
-    with st.chat_message("assistant"):
-        with st.status("🔍 Veri Katmanları Analiz Ediliyor...", expanded=False):
-            vec = embeddings.embed_query(prompt)
-            res = pinecone_index.query(vector=vec, top_k=3, include_metadata=True)
-            archive = "\n".join([m['metadata']['text'] for m in res['matches']])
-            ans = get_manager_analysis(prompt, archive)
-        
-        st.markdown(ans)
-        st.session_state.messages.append({"role": "assistant", "content": ans})
-        
-        # Otomatik Bağlam Güncelleme
-        if "Fenerbahçe" in ans or "Fenerbahçe" in prompt: st.session_state.tactic_context['focus_team'] = "FENERBAHÇE"
-        elif "Galatasaray" in ans: st.session_state.tactic_context['focus_team'] = "GALATASARAY"
-        
-        for f in ["4-3-3", "4-2-3-1", "3-5-2", "4-4-2"]:
-            if f in ans or f in prompt: st.session_state.tactic_context['formation'] = f
-            
-        st.session_state.tactic_context['scouting_report'] = ans
-        st.session_state.tactic_context['last_update'] = time.time()
-        st.rerun()
