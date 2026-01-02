@@ -6,15 +6,16 @@ from pinecone import Pinecone
 from langchain_community.embeddings import HuggingFaceEmbeddings
 import time
 
-# --- 1. SAYFA KONFİGÜRASYONU ---
-st.set_page_config(page_title="DATALIG Football OS", page_icon="⚽", layout="wide")
+# --- 1. SAYFA AYARLARI ---
+st.set_page_config(page_title="DATALIG Mastermind OS", page_icon="🧠", layout="wide")
 
-# --- 2. BEYİN (SESSION STATE) ---
+# --- 2. MASTERMIND SESSION STATE ---
 if 'tactic_context' not in st.session_state:
     st.session_state.tactic_context = {
         "focus_team": "HAZIR",
         "formation": "4-3-3",
-        "scouting_report": "Sistem aktif. Taktiksel veri bekleniyor...",
+        "game_phase": "SET HÜCUMU", # Yeni: Oyun Fazı
+        "scouting_report": "Efsanelerin ortak aklı devreye alınıyor. Veri girişi bekleniyor...",
         "last_update": time.time()
     }
 
@@ -31,131 +32,116 @@ def init_system():
 
 client, pinecone_index, embeddings = init_system()
 
-def get_manager_analysis(query):
-    MODEL_ID = "gemini-2.0-flash" # Gemini 2.5 Paid Tier gücü
+def get_mastermind_analysis(query, phase):
+    MODEL_ID = "gemini-2.0-flash" 
     search_tool = types.Tool(google_search=types.GoogleSearch())
     current_date = "2 Ocak 2026"
     
     config = types.GenerateContentConfig(
         tools=[search_tool],
-        system_instruction=f"Tarih: {current_date}. Sen DATALIG Baş Stratejistisin. İnternetten WhoScored, FBref ve haberleri tara. Yanıtın sonunda mutlaka [TEAM: ..., FORMATION: ...] ekle."
+        system_instruction=f"""
+        Sen Pep, Mourinho, Klopp ve Ancelotti'nin futbol zekalarının birleşimisin. 
+        Analizini şu 3 evreye göre yap: 
+        1. Savunma (Simeone/Mourinho perspektifi)
+        2. Set Hücumu (Pep/Enrique perspektifi)
+        3. Geçiş Hücumu (Klopp/Ferguson perspektifi).
+        Şu anki odak evren: {phase}. 
+        Yanıtın sonunda mutlaka [TEAM: ..., FORMATION: ...] ekle.
+        """
     )
     response = client.models.generate_content(model=MODEL_ID, contents=[query], config=config)
     return response.text
 
-# --- 4. 🎮 TAKTİKSEL ŞABLON TETİKLEYİCİSİ ---
-def run_command(cmd_name):
-    team = st.session_state.tactic_context['focus_team']
-    prompts = {
-        "RAKIP": f"{team} takımının sıradaki resmi rakibini internetten bul ve zayıf noktalarını analiz et.",
-        "SAVUNMA": f"{team} için bu haftaki rakibe özel bir savunma yerleşimi ve pres planı hazırla.",
-        "HUCUM": f"{team} için hızlı hücum geçişleri ve kilit pas kanalları analizi yap.",
-        "TRANSFER": f"{team} için Ocak 2026 transfer döneminde adı geçen oyuncuların taktiksel uyumunu incele."
-    }
-    
-    with st.spinner("Oracle veri katmanlarını işliyor..."):
-        ans = get_manager_analysis(prompts[cmd_name])
-        st.session_state.tactic_context['scouting_report'] = ans
-        
-        # Analizden takım ve diziliş bilgisini çekme
-        if "4-2-3-1" in ans: st.session_state.tactic_context['formation'] = "4-2-3-1"
-        elif "3-5-2" in ans: st.session_state.tactic_context['formation'] = "3-5-2"
-        st.rerun()
-
-# --- 5. 🏟️ STITCH UI MOTORU ---
-def render_dashboard(context):
+# --- 4. 🏟️ MASTERMIND DİNAMİK SAHA (V1.0) ---
+def render_mastermind_ui(context):
     report = context['scouting_report'].replace("\n", "<br>").replace('"', "'")
-    team = context['focus_team']
+    phase = context['game_phase']
     form = context['formation']
     
-    # Diziliş Piyonları
+    # Koordinatlar ve Taktiksel Oklar (Faz bazlı dinamik yapı)
+    arrows_html = ""
+    if phase == "SET HÜCUMU":
+        # Pep usulü beklerin içeri kat etmesi ve kanat genişliği okları
+        arrows_html = """
+        <line x1="15%" y1="80%" x2="35%" y2="70%" stroke="#13c8ec" stroke-dasharray="4" stroke-width="2" marker-end="url(#arrowhead)" />
+        <line x1="85%" y1="80%" x2="65%" y2="70%" stroke="#13c8ec" stroke-dasharray="4" stroke-width="2" marker-end="url(#arrowhead)" />
+        <circle cx="50%" cy="30%" r="40" fill="rgba(0,229,255,0.05)" stroke="rgba(0,229,255,0.2)" stroke-dasharray="2" />
+        """
+    elif phase == "SAVUNMA":
+        # Simeone usulü dar blok ve kompakt yapı çizgileri
+        arrows_html = """
+        <rect x="20%" y="70%" width="60%" height="20%" fill="rgba(239,68,68,0.1)" stroke="rgba(239,68,68,0.3)" stroke-width="1" />
+        <line x1="50%" y1="60%" x2="50%" y2="90%" stroke="#ef4444" stroke-width="1" stroke-dasharray="2" />
+        """
+
+    # Piyon Yerleşimi
     pos_db = {
         "4-3-3": [(93, 50, "1"), (80, 15, "3"), (82, 38, "4"), (82, 62, "5"), (80, 85, "2"), (55, 30, "8"), (60, 50, "6"), (55, 70, "10"), (30, 20, "7"), (25, 50, "9"), (30, 80, "11")],
         "4-2-3-1": [(93, 50, "1"), (80, 15, "3"), (82, 38, "4"), (82, 62, "5"), (80, 85, "2"), (65, 40, "6"), (65, 60, "8"), (45, 20, "7"), (42, 50, "10"), (45, 80, "11"), (25, 50, "9")]
     }
-    players_html = "".join([f"<div style='position:absolute; top:{t}%; left:{l}%; transform:translate(-50%,-50%); z-index:20;'><div style='width:22px; height:22px; border-radius:50%; background:white; border:2px solid #13c8ec; display:flex; align-items:center; justify-content:center; font-size:9px; font-weight:bold; color:black; box-shadow: 0 0 10px rgba(19,200,236,0.6);'>{num}</div></div>" for t, l, num in pos_db.get(form, pos_db["4-3-3"])])
+    players_html = "".join([f"<div style='position:absolute; top:{t}%; left:{l}%; transform:translate(-50%,-50%); z-index:20;'><div style='width:24px; height:24px; border-radius:50%; background:white; border:2px solid #13c8ec; display:flex; align-items:center; justify-content:center; font-size:9px; font-weight:bold; color:black; box-shadow: 0 0 10px rgba(19,200,236,0.6);'>{num}</div></div>" for t, l, num in pos_db.get(form, pos_db["4-3-3"])])
 
-    # Dashoard HTML
-    full_html = f"""
+    html_template = f"""
     <!DOCTYPE html>
     <html class="dark">
     <head>
         <script src="https://cdn.tailwindcss.com"></script>
-        <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono&display=swap" rel="stylesheet">
         <style>
-            body {{ background: #111718; color: white; font-family: sans-serif; margin:0; overflow:hidden; }}
+            body {{ background: #0b1011; color: white; font-family: sans-serif; margin:0; overflow:hidden; }}
             .pitch-stripes {{ background-color: #173828; background-image: repeating-linear-gradient(0deg, transparent, transparent 50px, rgba(255, 255, 255, 0.03) 50px, rgba(255, 255, 255, 0.03) 100px); }}
-            .panel {{ background: #111718; border: 1px solid #283639; border-radius: 8px; }}
-            .oracle-box {{ background: #0b1011; border: 1px solid #283639; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #94a3b8; padding: 15px; height: 350px; overflow-y: auto; }}
+            .master-panel {{ background: #111718; border: 1px solid #283639; border-radius: 8px; padding: 15px; }}
         </style>
     </head>
     <body class="p-4">
-        <div class="grid grid-cols-12 gap-4 h-screen">
-            <div class="col-span-3 flex flex-col gap-4">
-                <div class="panel p-4">
-                    <h3 class="text-xs font-bold text-primary mb-3 uppercase tracking-widest text-[#13c8ec]">Tactical Command</h3>
-                    <p class="text-[10px] text-gray-500 mb-4">Aşağıdaki kontrolleri Streamlit Sidebar'dan yönetin.</p>
+        <div class="grid grid-cols-12 gap-4">
+            <div class="col-span-4 flex flex-col gap-4 h-[650px]">
+                <div class="master-panel bg-primary/5 border-primary/20">
+                    <h2 class="text-primary font-bold text-sm tracking-widest uppercase mb-1">🧠 MASTERMIND CORE</h2>
+                    <p class="text-[10px] text-gray-500 uppercase">Phase: {phase} | Style: Hybrid Elite</p>
                 </div>
-                <div class="panel p-4 flex-1">
-                    <h3 class="text-xs font-bold text-[#13c8ec] mb-3 uppercase tracking-widest">Oracle Intelligence</h3>
-                    <div class="oracle-box">{report}</div>
+                <div class="master-panel flex-1 overflow-y-auto font-mono text-xs leading-relaxed text-gray-400">
+                    {report}
                 </div>
             </div>
 
-            <div class="col-span-6 flex items-center justify-center bg-[#0f1516] rounded-xl border border-[#283639] relative">
-                <div class="relative w-[400px] h-[580px] pitch-stripes rounded-lg border-2 border-white/20 overflow-hidden">
-                    <div style="position:absolute; inset:20px; border:1px solid rgba(255,255,255,0.3);">
-                        <div style="position:absolute; top:50%; left:0; right:0; height:1px; background:rgba(255,255,255,0.3);"></div>
-                        <div style="position:absolute; top:0; left:50%; width:160px; height:60px; border:1px solid rgba(255,255,255,0.3); border-top:0; transform:translateX(-50%);"></div>
-                        <div style="position:absolute; bottom:0; left:50%; width:160px; height:60px; border:1px solid rgba(255,255,255,0.3); border-bottom:0; transform:translateX(-50%);"></div>
+            <div class="col-span-8 master-panel relative flex items-center justify-center bg-[#0f1516]">
+                <div class="relative w-[420px] h-[580px] pitch-stripes rounded-lg border-2 border-white/10 overflow-hidden">
+                    <svg style="position:absolute; inset:0; width:100%; height:100%; z-index:15;">
+                        <defs><marker id="arrowhead" markerWidth="10" markerHeight="7" refX="0" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#13c8ec"/></marker></defs>
+                        {arrows_html}
+                    </svg>
+                    <div style="position:absolute; inset:20px; border:1px solid rgba(255,255,255,0.2);">
+                        <div style="position:absolute; top:50%; left:0; right:0; height:1px; background:rgba(255,255,255,0.2);"></div>
                     </div>
                     {players_html}
-                </div>
-            </div>
-
-            <div class="col-span-3 flex flex-col gap-4">
-                <div class="panel p-6">
-                    <h3 class="text-xs font-bold text-[#13c8ec] mb-4 uppercase tracking-widest">Match Metrics</h3>
-                    <div class="mb-4">
-                        <span class="text-[10px] text-gray-500 block uppercase">Active Team</span>
-                        <span class="text-lg font-bold">{team}</span>
-                    </div>
-                    <div class="mb-4">
-                        <span class="text-[10px] text-gray-500 block uppercase">Formation</span>
-                        <span class="text-lg font-bold text-[#13c8ec]">{form}</span>
-                    </div>
                 </div>
             </div>
         </div>
     </body>
     </html>
     """
-    return components.html(full_html, height=720)
+    return components.html(html_template, height=700)
 
-# --- 6. 🎮 SIDEBAR KONTROL MERKEZİ ---
+# --- 5. ANA KONTROLLER ---
 with st.sidebar:
-    st.image("https://cdn-icons-png.flaticon.com/512/53/53283.png", width=50) # Opsiyonel logo
-    st.title("DATALIG OS")
+    st.title("🧠 MASTERMIND OS")
     st.markdown("---")
-    
-    st.subheader("🕹️ Taktiksel Tetikleyiciler")
-    if st.button("🔍 RAKİP GÖZLEMİ", use_container_width=True): run_command("RAKIP")
-    if st.button("🛡️ SAVUNMA REÇETESİ", use_container_width=True): run_command("SAVUNMA")
-    if st.button("⚡ KARŞI ATAK PLANI", use_container_width=True): run_command("HUCUM")
-    if st.button("📉 TRANSFER UYUMU", use_container_width=True): run_command("TRANSFER")
+    phase = st.radio("OYUN EVRESİ SEÇİN", ["SET HÜCUMU", "SAVUNMA", "GEÇİŞ ATATKI"])
+    st.session_state.tactic_context['game_phase'] = phase
     
     st.markdown("---")
-    st.info("Hızlı komutlar, aktif odağınızdaki takımı baz alarak Oracle'ı internette araştırmaya sevk eder.")
+    st.subheader("🎯 Efsanevi Direktifler")
+    if st.button("RAKİBİ DEŞİFRE ET (Enrique/Tedesco)"):
+        team = st.session_state.tactic_context['focus_team']
+        ans = get_mastermind_analysis(f"{team} için rakip analizi yap.", phase)
+        st.session_state.tactic_context['scouting_report'] = ans
+        st.rerun()
 
-# --- 7. DASHBOARD RENDER ---
-render_dashboard(st.session_state.tactic_context)
+# Render UI
+render_mastermind_ui(st.session_state.tactic_context)
 
 # Sohbet Girişi
-st.markdown("---")
-if prompt := st.chat_input("Daha spesifik bir soru sorun..."):
-    with st.chat_message("assistant"):
-        ans = get_manager_analysis(prompt)
-        st.markdown(ans)
-        st.session_state.tactic_context['scouting_report'] = ans
-        if "Fenerbahçe" in ans or "Fenerbahçe" in prompt: st.session_state.tactic_context['focus_team'] = "FENERBAHÇE"
-        st.rerun()
+if prompt := st.chat_input("Mastermind'a bir soru sor (Örn: Pep gibi hücum setleri kur)"):
+    ans = get_mastermind_analysis(prompt, st.session_state.tactic_context['game_phase'])
+    st.session_state.tactic_context['scouting_report'] = ans
+    st.rerun()
