@@ -11,25 +11,12 @@ st.set_page_config(page_title="DATALIG Football OS", page_icon="⚽", layout="wi
 
 if 'tactic_context' not in st.session_state:
     st.session_state.tactic_context = {
-        "focus_team": "HAZIR",
+        "focus_team": "BEKLEMEDE",
         "formation": "4-3-3",
-        "scouting_report": "Analiz için veri bekleniyor...",
+        "scouting_report": "Analitik komut bekleniyor...",
     }
 
-if 'authenticated' not in st.session_state:
-    st.session_state.authenticated = False
-
-# --- 2. GİRİŞ KONTROLÜ ---
-if not st.session_state.authenticated:
-    st.markdown("<h1 style='text-align:center; color:#22c55e;'>DATALIG ANALYST LOGIN</h1>", unsafe_allow_html=True)
-    pw = st.text_input("Sistem Şifresi", type="password", key="login_pass")
-    if st.button("SİSTEME GİRİŞ"):
-        if pw == "datalig2025":
-            st.session_state.authenticated = True
-            st.rerun()
-    st.stop()
-
-# --- 3. SİSTEM BAŞLATMA ---
+# --- 2. 🧠 ANALİST MOTORU ---
 @st.cache_resource
 def init_system():
     try:
@@ -44,95 +31,104 @@ client, pinecone_index, embeddings = init_system()
 
 def get_manager_analysis(query):
     search_tool = types.Tool(google_search=types.GoogleSearch())
-    config = types.GenerateContentConfig(tools=[search_tool], system_instruction="Sen bir futbol stratejistisin. Yanıtın sonunda [TEAM: ..., FORMATION: ...] ekle.")
+    config = types.GenerateContentConfig(tools=[search_tool], system_instruction="Futbol stratejistisin. Yanıtın sonunda mutlaka [TEAM: ..., FORMATION: ...] bilgisini ver.")
     response = client.models.generate_content(model="gemini-2.0-flash", contents=[query], config=config)
     return response.text
 
-# --- 4. 🏟️ KLASİK YEŞİL SAHA MOTORU (V7.5) ---
-def render_analyst_ui(context):
+# --- 3. 🏟️ PRO-TACTICAL UI MOTORU (GÖRSELE UYGUN) ---
+def render_cyber_pitch(context):
     report = context['scouting_report'].replace("\n", "<br>").replace('"', "'")
     team = context['focus_team']
     form = context['formation']
     
-    # Dikey Diziliş Koordinatları (Yeşil Saha Üzerine)
+    # Görseldeki gibi piyon yerleşimi ve neon halkalar
     pos_map = {
-        "4-3-3": [
-            (93, 50, "GK"), (78, 15, "LB"), (82, 38, "CB"), (82, 62, "CB"), (78, 85, "RB"),
-            (60, 30, "CM"), (65, 50, "DM"), (60, 70, "CM"),
-            (35, 20, "LW"), (28, 50, "ST"), (35, 80, "RW")
-        ],
-        "4-2-3-1": [
-            (93, 50, "GK"), (78, 15, "LB"), (82, 35, "CB"), (82, 65, "CB"), (78, 85, "RB"),
-            (68, 40, "DM"), (68, 60, "DM"), (45, 25, "LM"), (42, 50, "AM"), (45, 75, "RM"), (25, 50, "ST")
-        ]
+        "4-3-3": [(92, 50, "GK"), (78, 15, "LB"), (80, 38, "CB"), (80, 62, "CB"), (78, 85, "RB"), (58, 30, "CM"), (62, 50, "DM"), (58, 70, "CM"), (30, 20, "LW"), (25, 50, "ST"), (30, 80, "RW")],
+        "4-2-3-1": [(92, 50, "GK"), (78, 15, "LB"), (80, 35, "CB"), (80, 65, "CB"), (78, 85, "RB"), (65, 40, "DM"), (65, 60, "DM"), (45, 20, "LM"), (42, 50, "AM"), (45, 80, "RM"), (22, 50, "ST")]
     }
     
     active_pos = pos_map.get(form, pos_map["4-3-3"])
-    players_html = ""
-    for t, l, label in active_pos:
-        players_html += f"""
-        <div style='position:absolute; top:{t}%; left:{l}%; transform:translate(-50%,-50%); z-index:10; text-align:center;'>
-            <div style='width:22px; height:22px; border-radius:50%; background:#fff; border:2px solid #1e3a8a; box-shadow:0 2px 4px rgba(0,0,0,0.3);'></div>
-            <div style='font-size:9px; color:white; font-weight:bold; background:rgba(0,0,0,0.6); padding:1px 3px; border-radius:3px; margin-top:2px;'>{label}</div>
-        </div>"""
+    players_html = "".join([f"""
+        <div style='position:absolute; top:{t}%; left:{l}%; transform:translate(-50%,-50%); z-index:10;'>
+            <div style='width:26px; height:26px; border-radius:50%; background:#0B0E14; border:2px solid #00E5FF; box-shadow:0 0 12px #00E5FF; display:flex; align-items:center; justify-content:center;'>
+                <span style='color:#00E5FF; font-size:9px; font-weight:bold;'>{label}</span>
+            </div>
+            <div style='position:absolute; width:40px; height:40px; border:1px solid rgba(0,229,255,0.1); border-radius:50%; top:-7px; left:-7px; animation: pulse 2s infinite;'></div>
+        </div>""" for t, l, label in active_pos])
 
     html_template = f"""
     <!DOCTYPE html>
     <html>
     <head>
+        <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
         <style>
-            body {{ background:#111827; color:#e5e7eb; font-family:sans-serif; margin:0; padding:15px; }}
-            .analyst-container {{ display:grid; grid-template-columns: 350px 1fr; gap:20px; height:600px; }}
-            .report-panel {{ background:#1f2937; border:1px solid #374151; border-radius:12px; padding:20px; overflow-y:auto; }}
+            body {{ background:#05070A; color:#E0E6ED; font-family:'Share Tech Mono', monospace; margin:0; padding:10px; }}
+            .main-grid {{ display:grid; grid-template-columns: 320px 1fr 280px; gap:15px; height:600px; }}
+            .panel {{ background:rgba(13, 17, 23, 0.9); border:1px solid #1B2533; border-radius:4px; padding:15px; position:relative; overflow:hidden; }}
             
-            /* Yeşil Saha Tasarımı */
-            .pitch {{ 
-                position:relative; background:#2d5a27; border:3px solid #fff; border-radius:4px; 
-                height:100%; width:420px; margin:0 auto;
-                background-image: repeating-linear-gradient(0deg, #2d5a27, #2d5a27 10%, #356330 10%, #356330 20%);
+            /* GÖRSELDEKİ SAHA TASARIMI */
+            .pitch-area {{ 
+                background:#0B0E14; border:2px solid #1B2533; position:relative; overflow:hidden;
+                background-image: 
+                    linear-gradient(rgba(31, 41, 55, 0.2) 1px, transparent 1px),
+                    linear-gradient(90deg, rgba(31, 41, 55, 0.2) 1px, transparent 1px);
+                background-size: 40px 40px; /* Görseldeki kareli zemin */
             }}
-            .pitch-line {{ position:absolute; border:1px solid rgba(255,255,255,0.8); }}
-            .center-circle {{ position:absolute; top:50%; left:50%; width:80px; height:80px; border:1px solid white; border-radius:50%; transform:translate(-50%,-50%); }}
-            .center-line {{ position:absolute; top:50%; left:0; right:0; height:1px; background:white; }}
+            .pitch-lines {{ position:absolute; inset:20px; border:1px solid rgba(255,255,255,0.1); }}
+            .center-circle {{ position:absolute; top:50%; left:50%; width:100px; height:100px; border:1px solid rgba(0,229,255,0.3); border-radius:50%; transform:translate(-50%,-50%); }}
+            .center-line {{ position:absolute; top:50%; left:0; right:0; height:1px; background:rgba(255,255,255,0.1); }}
             
-            /* Kaleler (Kısa Kenarlar) */
-            .penalty-area-top {{ position:absolute; top:0; left:50%; width:180px; height:70px; border:1px solid white; border-top:0; transform:translateX(-50%); }}
-            .penalty-area-bottom {{ position:absolute; bottom:0; left:50%; width:180px; height:70px; border:1px solid white; border-bottom:0; transform:translateX(-50%); }}
-            .goal-box {{ position:absolute; width:40px; height:4px; background:#fff; left:50%; transform:translateX(-50%); }}
+            /* HUD Elementleri */
+            .status-tag {{ position:absolute; top:10px; right:10px; background:rgba(0,229,255,0.1); color:#00E5FF; padding:2px 8px; font-size:10px; border:1px solid #00E5FF; }}
+            @keyframes pulse {{ 0% {{ transform:scale(0.8); opacity:0.5; }} 100% {{ transform:scale(1.2); opacity:0; }} }}
+            
+            .report-text {{ font-size:11px; line-height:1.6; color:#94A3B8; height:100%; overflow-y:auto; }}
         </style>
     </head>
     <body>
-        <div style="display:flex; justify-content:space-between; margin-bottom:15px;">
-            <b style="color:#22c55e;">DATALIG ANALYST CENTER</b>
-            <div style="display:flex; gap:10px;">
-                <span style="background:#374151; padding:2px 10px; border-radius:4px; font-size:12px;">TAKIM: {team}</span>
-                <span style="background:#1e40af; padding:2px 10px; border-radius:4px; font-size:12px;">DİZİLİŞ: {form}</span>
+        <div class="main-grid">
+            <div class="panel">
+                <div style="color:#00E5FF; font-size:12px; margin-bottom:15px; border-bottom:1px solid #1B2533;">TACTICAL COMMAND</div>
+                <div style="display:flex; flex-direction:column; gap:8px;">
+                    <div style="border:1px solid #00E5FF; padding:8px; font-size:10px; color:#00E5FF;">🔍 RAKİP GÖZLEMİ</div>
+                    <div style="border:1px solid #1B2533; padding:8px; font-size:10px;">🛡️ SAVUNMA REÇETESİ</div>
+                    <div style="border:1px solid #1B2533; padding:8px; font-size:10px;">📈 TRANSFER UYUMU</div>
+                </div>
+                <div style="margin-top:20px; color:#94A3B8; font-size:11px;">
+                    <div style="color:#00E5FF; margin-bottom:5px;">ORACLE REPORT</div>
+                    <div class="report-text">{report}</div>
+                </div>
             </div>
-        </div>
-        <div class="analyst-container">
-            <div class="report-panel">
-                <div style="font-size:12px; color:#10b981; margin-bottom:10px; font-weight:bold;">TACTICAL INTELLIGENCE</div>
-                <div style="font-size:13px; line-height:1.6;">{report}</div>
-            </div>
-            <div style="background:#1f2937; border-radius:12px; display:flex; align-items:center; border:1px solid #374151;">
-                <div class="pitch">
-                    <div class="goal-box" style="top:-2px;"></div>
-                    <div class="penalty-area-top"></div>
+
+            <div class="pitch-area">
+                <div class="status-tag">TACTICAL COMMAND ACTIVE</div>
+                <div class="pitch-lines">
                     <div class="center-line"></div>
                     <div class="center-circle"></div>
-                    <div class="penalty-area-bottom"></div>
-                    <div class="goal-box" style="bottom:-2px;"></div>
-                    {players_html}
+                    <div style="position:absolute; top:0; left:50%; width:200px; height:80px; border:1px solid rgba(255,255,255,0.1); border-top:0; transform:translateX(-50%);"></div>
+                    <div style="position:absolute; bottom:0; left:50%; width:200px; height:80px; border:1px solid rgba(255,255,255,0.1); border-bottom:0; transform:translateX(-50%);"></div>
+                </div>
+                {players_html}
+            </div>
+
+            <div class="panel">
+                <div style="font-size:10px; color:#94A3B8; margin-bottom:20px;">
+                    <div>ACTIVE TEAM:</div>
+                    <div style="color:#FFF; font-size:14px; margin-bottom:15px;">{team}</div>
+                    <div>FORMATION:</div>
+                    <div style="color:#00E5FF; font-size:14px; margin-bottom:15px;">{form}</div>
+                    <div>DATA STATUS:</div>
+                    <div style="color:#22C55E; font-size:14px;">REAL-TIME</div>
                 </div>
             </div>
         </div>
     </body>
     </html>
     """
-    return components.html(html_template, height=650)
+    return components.html(html_template, height=620)
 
-# --- 5. ANA EKRAN ---
-render_analyst_ui(st.session_state.tactic_context)
+# --- 4. ANA ARAYÜZ ---
+render_cyber_pitch(st.session_state.tactic_context)
 
 st.markdown("---")
 if "messages" not in st.session_state: st.session_state.messages = []
@@ -140,14 +136,14 @@ if "messages" not in st.session_state: st.session_state.messages = []
 for msg in st.session_state.messages[-2:]:
     with st.chat_message(msg["role"]): st.markdown(msg["content"])
 
-if prompt := st.chat_input("Analiz komutu girin..."):
+if prompt := st.chat_input("Taktiksel komut girişi..."):
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("assistant"):
         ans = get_manager_analysis(prompt)
         st.markdown(ans)
         st.session_state.messages.append({"role": "assistant", "content": ans})
         
-        # Bağlam Güncelleme
+        # Otomatik State Güncelleme
         if "Fenerbahçe" in ans or "Fenerbahçe" in prompt: st.session_state.tactic_context['focus_team'] = "FENERBAHÇE"
         if "4-2-3-1" in ans: st.session_state.tactic_context['formation'] = "4-2-3-1"
         st.session_state.tactic_context['scouting_report'] = ans
