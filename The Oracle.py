@@ -2,117 +2,105 @@ import streamlit as st
 import streamlit.components.v1 as components
 from google import genai
 from google.genai import types
-from pinecone import Pinecone
-from langchain_community.embeddings import HuggingFaceEmbeddings
 import time
 
 # --- 1. SAYFA AYARLARI ---
 st.set_page_config(page_title="DATALIG Mastermind OS", page_icon="🧬", layout="wide")
 
-# --- 2. MASTERMIND SESSION STATE ---
+# --- 2. DİNAMİK TAKIM LİSTESİ (Örnek Havuz - Genişletilebilir) ---
+# Gerçek uygulamada burası bir API'den veya JSON'dan beslenebilir.
+ALL_TEAMS = [
+    "Galatasaray", "Fenerbahçe", "Beşiktaş", "Trabzonspor", 
+    "Real Madrid", "Manchester City", "Arsenal", "Liverpool", 
+    "Bayern Munich", "PSG", "Inter Milan", "Barcelona", "Napoli",
+    "Aston Villa", "Bayer Leverkusen", "Girona", "Benfica"
+]
+
+# --- 3. SESSION STATE GÜNCELLEME ---
 if 'tactic_context' not in st.session_state:
     st.session_state.tactic_context = {
-        "focus_team": "HAZIR",
+        "focus_team": "Seçilmedi",
         "formation": "4-3-3",
         "game_phase": "SET HÜCUMU",
-        "opponent_dna": "Veri yok. Analiz bekleniyor...",
-        "scouting_report": "Sistem aktif. Mastermind hazır.",
+        "opponent_dna": "Lütfen önce analiz edilecek takımı seçin.",
+        "scouting_report": "Stratejik merkez hazır. Odak takım bekleniyor.",
     }
 
-# --- 3. SİSTEM BAŞLATMA (GEMINI 2.5 FLASH MÜHÜRLÜ) ---
-@st.cache_resource
-def init_system():
-    try:
-        client = genai.Client(api_key=st.secrets["GOOGLE_API_KEY"])
-        pc = Pinecone(api_key=st.secrets["PINECONE_API_KEY"])
-        idx = pc.Index("regista-arsiv")
-        embeds = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
-        return client, idx, embeds
-    except: return None, None, None
-
-client, pinecone_index, embeddings = init_system()
-
+# --- 4. GEMINI 2.5 FLASH ANALİZ MOTORU ---
 def get_mastermind_analysis(query, mode="TACTIC"):
-    MODEL_ID = "gemini-2.5-flash" # HAFIZAYA KAYDEDİLDİ: GEMINI 2.5
+    MODEL_ID = "gemini-2.5-flash"
+    client = genai.Client(api_key=st.secrets["GOOGLE_API_KEY"])
     search_tool = types.Tool(google_search=types.GoogleSearch())
     
-    # Mode bazlı sistem talimatı
     if mode == "OPPONENT_DNA":
-        instruction = "Sen Domenico Tedesco ve Luis Enrique'sin. Rakibin WhoScored/FBref verilerini tara. Zayıf halkayı, pres altındaki hata payını ve en çok gol yedikleri bölgeyi sayısal dök."
+        instruction = "Sen Domenico Tedesco ve Luis Enrique'sin. Rakibin en güncel maç verilerini internetten (WhoScored, Opta, Transfermarkt) bul ve zayıf halkalarını deşifre et."
     else:
-        instruction = "Sen Pep, Mourinho ve Klopp'un birleşimi olan bir taktik dehasısın."
+        instruction = "Sen Pep Guardiola, Jose Mourinho ve Jurgen Klopp'un hibrit zekasısın."
 
     config = types.GenerateContentConfig(
         tools=[search_tool],
-        system_instruction=f"Tarih: 2 Ocak 2026. {instruction} Yanıtın sonunda [TEAM: ..., FORMATION: ...] ekle."
+        system_instruction=f"Tarih: 2 Ocak 2026. {instruction}"
     )
-    response = client.models.generate_content(model=MODEL_ID, contents=[query], config=config)
-    return response.text
-
-# --- 4. 🏟️ MASTERMIND UI (DNA PANEL ENTEGRELİ) ---
-def render_mastermind_ui(context):
-    report = context['scouting_report'].replace("\n", "<br>").replace('"', "'")
-    dna = context['opponent_dna'].replace("\n", "<br>").replace('"', "'")
-    phase = context['game_phase']
     
-    html_template = f"""
-    <!DOCTYPE html>
-    <html class="dark">
-    <head>
-        <script src="https://cdn.tailwindcss.com"></script>
-        <style>
-            body {{ background: #0b1011; color: white; font-family: sans-serif; margin:0; overflow:hidden; }}
-            .panel {{ background: #111718; border: 1px solid #283639; border-radius: 8px; padding: 15px; }}
-            .dna-box {{ border-left: 4px solid #facc15; background: rgba(250, 204, 21, 0.05); padding: 10px; font-size: 11px; color: #fbbf24; }}
-            .pitch-stripes {{ background-color: #173828; background-image: repeating-linear-gradient(0deg, transparent, transparent 50px, rgba(255, 255, 255, 0.03) 50px, rgba(255, 255, 255, 0.03) 100px); }}
-        </style>
-    </head>
-    <body class="p-4">
-        <div class="grid grid-cols-12 gap-4 h-screen">
-            <div class="col-span-4 flex flex-col gap-4 overflow-y-auto">
-                <div class="panel">
-                    <h2 class="text-yellow-400 font-bold text-xs tracking-widest uppercase mb-2">🧬 OPPONENT DNA (DEŞİFRE)</h2>
-                    <div class="dna-box">{dna}</div>
-                </div>
-                <div class="panel flex-1 overflow-y-auto">
-                    <h2 class="text-cyan-400 font-bold text-xs tracking-widest uppercase mb-2">🧠 STRATEJİK RAPOR</h2>
-                    <div class="text-[11px] leading-relaxed text-gray-400">{report}</div>
-                </div>
-            </div>
+    try:
+        response = client.models.generate_content(model=MODEL_ID, contents=[query], config=config)
+        return response.text
+    except Exception as e:
+        return f"Analiz Hatası: {str(e)}"
 
-            <div class="col-span-8 panel relative flex items-center justify-center bg-[#0f1516]">
-                 <div class="relative w-[400px] h-[580px] pitch-stripes rounded-lg border-2 border-white/10 overflow-hidden">
-                    <div style="position:absolute; inset:20px; border:1px solid rgba(255,255,255,0.2);">
-                        <div style="position:absolute; top:50%; left:0; right:0; height:1px; background:rgba(255,255,255,0.2);"></div>
-                    </div>
-                    </div>
-            </div>
-        </div>
-    </body>
-    </html>
-    """
-    return components.html(html_template, height=720)
-
-# --- 5. SIDEBAR KONTROLLERİ ---
+# --- 5. SIDEBAR: MASTERMIND KOMUTA MERKEZİ ---
 with st.sidebar:
-    st.title("🧬 MASTERMIND SCOUT")
+    st.image("https://cdn-icons-png.flaticon.com/512/802/802276.png", width=60) # Taktik İkonu
+    st.title("MASTERMIND OS")
     st.markdown("---")
     
-    if st.button("🔬 RAKİBİ DEŞİFRE ET (Tedesco Modu)"):
-        team = st.session_state.tactic_context['focus_team']
-        # Gemini 2.5 Flash ile internet taraması
-        dna_results = get_mastermind_analysis(f"{team} takımının sıradaki rakibinin WhoScored ve FBref verilerini analiz et. Zayıf noktaları bul.", mode="OPPONENT_DNA")
-        st.session_state.tactic_context['opponent_dna'] = dna_results
-        st.rerun()
+    # --- TAKIM SEÇİCİ (AUTO-COMPLETE) ---
+    st.subheader("📍 ODAK TAKIM")
+    selected_team = st.selectbox(
+        "Analiz edilecek takımı yazın veya seçin:",
+        options=ALL_TEAMS,
+        index=None,
+        placeholder="Takım adı giriniz (Örn: Galatasaray)...",
+    )
+    
+    if selected_team:
+        st.session_state.tactic_context['focus_team'] = selected_team
+        st.success(f"Odak: {selected_team}")
 
     st.markdown("---")
+    
+    # --- DEŞİFRE BUTONU ---
+    if st.button("🔬 RAKİBİ DEŞİFRE ET", use_container_width=True, disabled=(selected_team is None)):
+        with st.spinner(f"{selected_team} deşifre ediliyor..."):
+            dna = get_mastermind_analysis(f"{selected_team} takımının taktiksel zayıflıkları ve rakip olarak karşılaşıldığında dikkat edilmesi gereken DNA verileri.", mode="OPPONENT_DNA")
+            st.session_state.tactic_context['opponent_dna'] = dna
+            st.rerun()
+
+    st.markdown("---")
+    st.subheader("⚙️ OYUN PARAMETRELERİ")
     phase = st.radio("OYUN EVRESİ", ["SET HÜCUMU", "SAVUNMA", "GEÇİŞ"])
     st.session_state.tactic_context['game_phase'] = phase
 
-# Render UI
-render_mastermind_ui(st.session_state.tactic_context)
+# --- 6. UI RENDER (Mastermind Arayüzü) ---
+def render_ui(context):
+    report = context['scouting_report'].replace("\n", "<br>")
+    dna = context['opponent_dna'].replace("\n", "<br>")
+    team = context['focus_team']
+    
+    # Stitch tasarımına sadık kalarak HTML render
+    html_content = f"""
+    <div style="background:#0b1011; color:white; padding:20px; font-family:sans-serif;">
+        <div style="display:grid; grid-template-columns: 1fr 2fr; gap:20px;">
+            <div style="background:#111718; border:1px solid #283639; padding:15px; border-radius:10px;">
+                <h3 style="color:#facc15; font-size:12px; border-bottom:1px solid #283639; padding-bottom:5px;">🧬 {team.upper()} DNA DEŞİFRESİ</h3>
+                <div style="font-size:11px; color:#94a3b8; margin-top:10px; line-height:1.6;">{dna}</div>
+            </div>
+            <div style="background:#0f1516; border:2px solid #283639; height:500px; border-radius:15px; position:relative; overflow:hidden;">
+                <div style="text-align:center; margin-top:200px; color:#13c8ec; opacity:0.3; font-weight:bold;">TACTICAL FIELD ACTIVE</div>
+            </div>
+        </div>
+    </div>
+    """
+    return components.html(html_content, height=600)
 
-if prompt := st.chat_input("Mastermind'a direktif ver..."):
-    ans = get_mastermind_analysis(prompt)
-    st.session_state.tactic_context['scouting_report'] = ans
-    st.rerun()
+render_ui(st.session_state.tactic_context)
