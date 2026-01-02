@@ -25,19 +25,27 @@ def get_mastermind_analysis(query, mode="TACTIC"):
     client = genai.Client(api_key=st.secrets["GOOGLE_API_KEY"])
     search_tool = types.Tool(google_search=types.GoogleSearch())
     
+    # --- GÜNCEL GERÇEKLİK FİLTRESİ ---
+    current_date = "2 Ocak 2026"
+    
     if mode == "DNA":
         sys_instruction = (
-            "Sen Domenico Tedesco ve Luis Enrique'sin. Rakibi deşifre et. "
-            "ÖNEMLİ: Yanıtının en başına tam olarak '### OZET START ###' yaz ve altına rakibin en zayıf 5 noktasını madde madde ekle. "
-            "Ardından '### OZET END ###' yaz ve detaylı analize geç."
+            f"Sen Domenico Tedesco'sun. BUGÜNÜN TARİHİ: {current_date}. "
+            "DİKKAT: Fenerbahçe'nin güncel ve kalıplaşmış dizilişi 4-2-3-1'dir. "
+            "Eski verileri (3'lü savunma vb.) görmezden gel. Sadece son 3 maçtaki gerçek dizilişleri baz al. "
+            "Eğer bir değişim varsa bunu kanıtlarıyla (sakatlık, cezalı vb.) belirt. "
+            "OZET BAŞLIKLAR'ı bu güncel verilere göre oluştur."
         )
     else:
-        sys_instruction = "Sen Pep, Mourinho ve Klopp'un birleşimi bir taktik dehasısın."
+        sys_instruction = f"Sen bir taktik dehasısın. Tarih: {current_date}. Güncel kadro ve form durumlarını internetten doğrula."
 
     config = types.GenerateContentConfig(tools=[search_tool], system_instruction=sys_instruction)
-    response = client.models.generate_content(model=MODEL_ID, contents=[query], config=config)
+    
+    # Sorguyu da zorluyoruz:
+    forced_query = f"GÜNCEL VERİ ANALİZİ (2026): {query}"
+    
+    response = client.models.generate_content(model=MODEL_ID, contents=[forced_query], config=config)
     return response.text
-
 # --- SIDEBAR BUTON GÜNCELLEMESİ ---
 if selected_team:
     st.session_state.tactic_context['focus_team'] = selected_team
