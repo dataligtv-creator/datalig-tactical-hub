@@ -19,6 +19,7 @@ if 'tactic_context' not in st.session_state:
     }
 
 # --- 3. ANALİZ MOTORU (GEMINI 2.5 FLASH) ---
+# --- ANALİZ MOTORU GÜNCELLEMESİ (Hatasız Özetleme Modu) ---
 def get_mastermind_analysis(query, mode="TACTIC"):
     MODEL_ID = "gemini-2.5-flash"
     client = genai.Client(api_key=st.secrets["GOOGLE_API_KEY"])
@@ -26,15 +27,44 @@ def get_mastermind_analysis(query, mode="TACTIC"):
     
     if mode == "DNA":
         sys_instruction = (
-            "Sen Domenico Tedesco ve Luis Enrique'sin. Rakibi sayısal ve taktiksel olarak deşifre et. "
-            "Yanıtının en başında 'ÖZET BAŞLIKLAR:' diyerek 5 kısa madde yaz, ardından detaylı analize geç."
+            "Sen Domenico Tedesco ve Luis Enrique'sin. Rakibi deşifre et. "
+            "ÖNEMLİ: Yanıtının en başına tam olarak '### OZET START ###' yaz ve altına rakibin en zayıf 5 noktasını madde madde ekle. "
+            "Ardından '### OZET END ###' yaz ve detaylı analize geç."
         )
     else:
-        sys_instruction = "Sen Pep, Mourinho, Klopp, Ferguson ve Ancelotti'nin hibrit zekasısın."
+        sys_instruction = "Sen Pep, Mourinho ve Klopp'un birleşimi bir taktik dehasısın."
 
     config = types.GenerateContentConfig(tools=[search_tool], system_instruction=sys_instruction)
     response = client.models.generate_content(model=MODEL_ID, contents=[query], config=config)
     return response.text
+
+# --- SIDEBAR BUTON GÜNCELLEMESİ ---
+if selected_team:
+    st.session_state.tactic_context['focus_team'] = selected_team
+    if st.button("🔬 RAKİBİ DEŞİFRE ET", use_container_width=True):
+        with st.spinner(f"🧬 {selected_team} DNA'sı çözülüyor..."):
+            full_response = get_mastermind_analysis(f"{selected_team} takımını deşifre et.", mode="DNA")
+            
+            # --- Akıllı Parçalama Mantığı ---
+            if "### OZET START ###" in full_response:
+                try:
+                    # Özeti çek
+                    summary_part = full_response.split("### OZET START ###")[1].split("### OZET END ###")[0]
+                    # Detaylı analizi temizle (başlıkları çıkararak chat'e yolla)
+                    detailed_part = full_response.replace("### OZET START ###", "").replace("### OZET END ###", "").replace(summary_part, "")
+                    
+                    st.session_state.tactic_context['dna_summary'] = summary_part.strip()
+                    st.session_state.tactic_context['messages'].append({
+                        "role": "assistant", 
+                        "content": f"🧬 **{selected_team.upper()} DETAYLI DNA ANALİZİ**\n\n{detailed_part.strip()}"
+                    })
+                except:
+                    st.session_state.tactic_context['dna_summary'] = "Özet ayrıştırılamadı, detaylar chat'te."
+            else:
+                st.session_state.tactic_context['dna_summary'] = "Analiz tamamlandı. Detaylar aşağıda."
+                st.session_state.tactic_context['messages'].append({"role": "assistant", "content": full_response})
+            
+            st.rerun()
 
 # --- 4. 🏟️ UI MOTORU ---
 def render_dashboard(context):
