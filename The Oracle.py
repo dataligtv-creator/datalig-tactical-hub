@@ -33,7 +33,7 @@ def init_system():
 client, pinecone_index, embeddings = init_system()
 
 def get_mastermind_analysis(query, phase):
-    MODEL_ID = "gemini-2.0-flash" 
+    MODEL_ID = "gemini-2.5-flash" 
     search_tool = types.Tool(google_search=types.GoogleSearch())
     current_date = "2 Ocak 2026"
     
