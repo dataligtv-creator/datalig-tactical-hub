@@ -34,11 +34,41 @@ def init_system():
 
 client, pinecone_index, embeddings = init_system()
 
+# --- ANALİZ MOTORU GÜNCELLEMESİ ---
 def get_manager_analysis(query):
+    # Model ID'sini Paid Tier avantajlarını kullanmak için mühürledik
+    MODEL_ID = "gemini-2.5-flash" 
+    
     search_tool = types.Tool(google_search=types.GoogleSearch())
-    config = types.GenerateContentConfig(tools=[search_tool], system_instruction="Sen DATALIG Baş Stratejistisin. Teknik direktöre net, veri odaklı taktikler ver. Yanıtın sonunda mutlaka [TEAM: ..., FORMATION: ...] bilgisini ver.")
-    response = client.models.generate_content(model="gemini-2.0-flash", contents=[query], config=config)
-    return response.text
+    
+    # 2026 Ocak verilerini taraması için tarih mühürleme
+    current_date = "2 Ocak 2026" 
+    
+    config = types.GenerateContentConfig(
+        tools=[search_tool],
+        temperature=1.0,
+        system_instruction=f"""
+        BUGÜNÜN TARİHİ: {current_date}. 
+        Sen DATALIG Baş Stratejistisin. 
+        Paid Tier yeteneklerini kullanarak en güncel WhoScored, FBref ve Transfermarkt verilerini internetten tara. 
+        Teknik direktöre net, veri odaklı taktikler ver. 
+        Yanıtın sonunda mutlaka [TEAM: ..., FORMATION: ...] bilgisini ver.
+        """
+    )
+
+    try:
+        # Sorguya tarihi ekleyerek modelin 2026 vizyonunu zorluyoruz
+        forced_query = f"{current_date} itibarıyla güncel futbol verileriyle yanıtla: {query}"
+        response = client.models.generate_content(
+            model=MODEL_ID, 
+            contents=[forced_query], 
+            config=config
+        )
+        return response.text
+    except Exception as e:
+        if "429" in str(e):
+            return "⚠️ KOTA LİMİTİ: Google API çok fazla istek aldı, lütfen 60 saniye bekleyin."
+        return f"❌ ANALİZ HATASI: {str(e)}"
 
 # --- 4. 🚀 STITCH ENTEGRE UI MOTORU ---
 def render_analyst_dashboard(context):
