@@ -34,9 +34,12 @@ if 'context' not in st.session_state:
 @st.cache_resource
 def init_system():
     try:
+        # secrets.toml dosyasında GOOGLE_API_KEY tanımlı olmalı
         client = genai.Client(api_key=st.secrets["GOOGLE_API_KEY"])
         return client
-    except: return None
+    except Exception as e:
+        st.error(f"API Bağlantı Hatası: {e}")
+        return None
 
 client = init_system()
 MODEL_ID = "gemini-2.5-flash"
@@ -47,6 +50,9 @@ def oracle_brain(mode, query):
     Oracle'ın düşünme motoru. Kişi isimlerinden arındırılmış, 
     saf futbol aklı ve veri bilimini sentezleyen yapı.
     """
+    if not client:
+        return "⚠️ API Bağlantısı Kurulamadı. Lütfen API Key'i kontrol edin."
+
     search_tool = types.Tool(google_search=types.GoogleSearch())
     
     # ANA SİSTEM TALİMATI (PERSONA)
@@ -83,7 +89,7 @@ def oracle_brain(mode, query):
     try:
         response = client.models.generate_content(model=MODEL_ID, contents=[query], config=config)
         return response.text
-    except Exception as e: return f"⚠️ Oracle Bağlantı Hatası: {str(e)}"
+    except Exception as e: return f"⚠️ Oracle Analiz Hatası: {str(e)}"
 
 # --- 6. GÖRSELLEŞTİRME (FÜTÜRİSTİK SAHA) ---
 def render_pitch(phase):
