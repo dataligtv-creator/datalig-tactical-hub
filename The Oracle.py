@@ -2,20 +2,18 @@ import streamlit as st
 import streamlit.components.v1 as components
 from google import genai
 from google.genai import types
-from pinecone import Pinecone
-from langchain_community.embeddings import HuggingFaceEmbeddings
 import time
 
-# --- 1. SİSTEM AYARLARI VE KİMLİK ---
-st.set_page_config(page_title="DATALIG MASTERMIND OS", page_icon="🧠", layout="wide")
+# --- 1. SİSTEM KİMLİĞİ VE AYARLAR ---
+st.set_page_config(page_title="THE ORACLE OS", page_icon="👁️", layout="wide")
 
-# Efsanevi Hocalar Listesi (Sistem Talimatı İçin)
-LEGENDS = "Pep Guardiola, Carlo Ancelotti, Sir Alex Ferguson, José Mourinho, Jürgen Klopp, Zinedine Zidane, Diego Simeone, Vicente del Bosque, Luis Enrique, Antonio Conte, Domenico Tedesco"
+# --- 2. GENİŞLETİLMİŞ VERİ HAVUZU ---
+TURKISH_TEAMS = ["Fenerbahçe", "Galatasaray", "Beşiktaş", "Trabzonspor", "Başakşehir", "Adana Demirspor"]
+EUROPEAN_GIANTS = ["Man City", "Real Madrid", "Bayern Munich", "Liverpool", "Arsenal", "Inter", "Leverkusen"]
+UEFA_POOL = ["Man United", "Tottenham", "Porto", "Ajax", "Lyon", "Slavia Prag", "Twente", "AZ Alkmaar", "Rangers"]
+ALL_TEAMS = sorted(list(set(TURKISH_TEAMS + EUROPEAN_GIANTS + UEFA_POOL)))
 
-# YouTube ve Medya Kaynakları
-ANALYST_CHANNELS = ["VOLE", "SportsDigitale", "Serbest Sekiz", "Erdal Vahid", "Socrates", "The Coaches Voice", "Tifo Football"]
-
-# --- 2. SESSION STATE (SİSTEM HAFIZASI) ---
+# --- 3. SESSION STATE (SİSTEM HAFIZASI) ---
 if 'context' not in st.session_state:
     st.session_state.context = {
         "focus_team": None,
@@ -23,152 +21,214 @@ if 'context' not in st.session_state:
         "formation": "4-3-3",
         "game_phase": "SET HÜCUMU",
         "reports": {
-            "dna": "Henüz analiz yapılmadı.",
-            "drills": "Antrenman programı bekleniyor.",
-            "omniscient": "Veri merkezi beklemede.",
-            "psyche": "Mental analiz yapılmadı."
+            "strategy": "",     # Stratejik Çözümleme
+            "omniscient": "",   # Veri Sentezi
+            "optimization": "", # Antrenman/Performans
+            "meta": "",         # Psikoloji/Hava
+            "timeline": "",     # Oyuncu Kırılma Noktası
+            "scenario": ""      # Kriz/Kaos Yönetimi
         }
     }
 
-# --- 3. GEMINI 2.5 FLASH VE PINECONE BAŞLATMA ---
+# --- 4. GEMINI 2.5 BAĞLANTISI ---
 @st.cache_resource
 def init_system():
     try:
-        # API Keyleri st.secrets'tan çeker
         client = genai.Client(api_key=st.secrets["GOOGLE_API_KEY"])
-        pc = Pinecone(api_key=st.secrets["PINECONE_API_KEY"])
-        idx = pc.Index("regista-arsiv") # Vektör veritabanı
-        embeds = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
-        return client, idx, embeds
-    except: return None, None, None
+        return client
+    except: return None
 
-client, pinecone_index, embeddings = init_system()
-MODEL_ID = "gemini-2.5-flash" # Mühürlendi
+client = init_system()
+MODEL_ID = "gemini-2.5-flash"
 
-# --- 4. ZEKİ ANALİZ FONKSİYONLARI ---
-
-def master_agent(task, query):
+# --- 5. ORACLE BRAIN: MERKEZİ ZEKA ---
+def oracle_brain(mode, query):
     """
-    Tüm modüllerin kullandığı ana beyin fonksiyonu.
-    Task'e göre persona değiştirir (Scout, Hoca, Psikolog).
+    Oracle'ın düşünme motoru. Kişi isimlerinden arındırılmış, 
+    saf futbol aklı ve veri bilimini sentezleyen yapı.
     """
     search_tool = types.Tool(google_search=types.GoogleSearch())
     
-    if task == "DNA":
-        sys_inst = f"Sen Domenico Tedesco ve Luis Enrique'sin. {st.session_state.context['focus_team']} için internetteki (WhoScored, FBref) verileri tara ve rakip zayıf halkalarını sayısal olarak deşifre et."
-    elif task == "DRILLS":
-        sys_inst = f"Sen Antonio Conte ve Sir Alex Ferguson'sun. Analiz edilen taktiği sahaya yansıtacak 3 somut antrenman drilli (Isınma, Ana Bölüm, Taktik) hazırla."
-    elif task == "OMNISCIENT":
-        sys_inst = f"Sen {LEGENDS} hibrit zekasına sahip bir Veri Bilimci'sin. xG, PPDA ve sakatlık verilerini bul ve bunları taktiksel bir dille yorumla."
-    elif task == "PSYCHE":
-        sys_inst = "Sen bir Spor Psikoloğu ve Meteoroloji Uzmanısın. Hoca basın toplantılarını, takımın stres seviyesini ve maç saati hava durumunu analiz et."
+    # ANA SİSTEM TALİMATI (PERSONA)
+    base_instruction = """
+    Sen THE ORACLE'sın. Hiçbir insanı taklit etmezsin. 
+    Sen, futbol tarihinin tüm taktiksel bilgisini, modern veri bilimini (xG, PPDA) 
+    ve oyun teorisini birleştiren üstün bir 'Futbol Karar Mekanizması'sın.
+    
+    Kurallar:
+    1. Asla 'Pep şöyle yapardı' deme. 'Veriler ve oyun geometrisi şunu emrediyor' de.
+    2. Cevapların net, otoriter ve çözüm odaklı olsun.
+    3. İnternetten en güncel verileri (sakatlık, hava durumu, son maç istatistikleri) canlı çek.
+    """
+    
+    # MODA GÖRE ÖZELLEŞMİŞ GÖREVLER
+    if mode == "STRATEGY":
+        task = "Görevin: Rakibi analiz et, zayıf halkaları bul ve mutlak galibiyet formülünü yaz."
+    elif mode == "OMNISCIENT":
+        task = "Görevin: xG, PPDA, pas ağları ve küresel analist yorumlarını sentezleyip maçın matematiksel röntgenini çekmek."
+    elif mode == "OPTIMIZATION":
+        task = "Görevin: Sahadaki taktiksel kurguyu kas hafızasına dönüştürecek bilimsel antrenman setleri hazırlamak."
+    elif mode == "META":
+        task = "Görevin: Hoca basın toplantılarını, takım stresini ve hava durumunu analiz ederek 'görünmez etkenleri' yönetmek."
+    elif mode == "TIMELINE":
+        task = "Görevin: Bir fizyolog gibi davranıp, hedef oyuncunun maç içinde fiziksel olarak tükendiği dakikayı tespit etmek."
+    elif mode == "SCENARIO":
+        task = "Görevin: Bir 'Oyun Yöneticisi' (Game Master) olarak, verilen kaotik senaryoda (kırmızı kart, geriye düşme) en rasyonel B Planını sunmak."
     else:
-        sys_inst = f"Sen {LEGENDS} birleşimisin."
+        task = ""
 
-    config = types.GenerateContentConfig(tools=[search_tool], system_instruction=sys_inst)
+    full_prompt = f"{base_instruction}\n{task}"
+    config = types.GenerateContentConfig(tools=[search_tool], system_instruction=full_prompt)
     
     try:
         response = client.models.generate_content(model=MODEL_ID, contents=[query], config=config)
         return response.text
-    except Exception as e: return f"Bağlantı Hatası: {str(e)}"
+    except Exception as e: return f"⚠️ Oracle Bağlantı Hatası: {str(e)}"
 
-# --- 5. GÖRSELLEŞTİRME VE UI (SAHA & PANELLER) ---
-
-def render_pitch(phase, formation):
-    # Dinamik oklar ve alanlar
-    svg_overlay = ""
-    if phase == "SET HÜCUMU":
-        svg_overlay = """
-        <line x1="10%" y1="50%" x2="40%" y2="20%" stroke="#13c8ec" stroke-width="2" marker-end="url(#arrow)" stroke-dasharray="5,5"/>
-        <line x1="10%" y1="50%" x2="40%" y2="80%" stroke="#13c8ec" stroke-width="2" marker-end="url(#arrow)" stroke-dasharray="5,5"/>
-        <circle cx="50%" cy="50%" r="60" fill="none" stroke="#13c8ec" stroke-opacity="0.2" stroke-width="2"/>
-        """
-    elif phase == "SAVUNMA":
-        svg_overlay = """
-        <rect x="30%" y="20%" width="40%" height="60%" fill="rgba(239,68,68,0.15)" stroke="none"/>
-        <line x1="30%" y1="20%" x2="30%" y2="80%" stroke="#ef4444" stroke-width="2"/>
-        """
+# --- 6. GÖRSELLEŞTİRME (FÜTÜRİSTİK SAHA) ---
+def render_pitch(phase):
+    # Fazlara göre dinamik SVG çizimleri
+    svg = ""
+    title = "GENEL GÖRÜNÜM"
     
-    # Basit Piyon Yerleşimi (4-3-3 Örneği)
-    players_html = "" # (Buraya daha önceki detaylı piyon kodları gelir)
+    if phase == "HÜCUM KURGUSU":
+        title = "HÜCUM GEOMETRİSİ"
+        svg = """
+        <defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="0" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#00ff9d" /></marker></defs>
+        <line x1="20%" y1="50%" x2="50%" y2="20%" stroke="#00ff9d" stroke-width="2" marker-end="url(#arrow)" stroke-dasharray="4"/>
+        <line x1="20%" y1="50%" x2="50%" y2="80%" stroke="#00ff9d" stroke-width="2" marker-end="url(#arrow)" stroke-dasharray="4"/>
+        <circle cx="50%" cy="50%" r="60" fill="none" stroke="#00ff9d" stroke-opacity="0.3" stroke-width="2"/>
+        """
+    elif phase == "SAVUNMA BLOĞU":
+        title = "SAVUNMA ORGANİZASYONU"
+        svg = """
+        <rect x="25%" y="20%" width="50%" height="60%" fill="rgba(255, 50, 50, 0.1)" stroke="#ff3232" stroke-width="1" stroke-dasharray="2"/>
+        <line x1="50%" y1="20%" x2="50%" y2="80%" stroke="#ff3232" stroke-width="1"/>
+        """
+    elif phase == "GEÇİŞ OYUNU":
+        title = "GEÇİŞ (TRANSITION)"
+        svg = """
+        <defs><marker id="bolt" markerWidth="10" markerHeight="10" refX="0" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#facc15" /></marker></defs>
+        <line x1="30%" y1="80%" x2="80%" y2="20%" stroke="#facc15" stroke-width="3" marker-end="url(#bolt)"/>
+        """
 
     html = f"""
-    <div style="background:#0f1516; border:2px solid #283639; border-radius:12px; height:600px; position:relative; overflow:hidden;">
+    <div style="background:#050505; border:1px solid #333; border-radius:12px; height:550px; position:relative; overflow:hidden; display:flex; justify-content:center; align-items:center;">
+        <div style="position:absolute; width:90%; height:90%; border:1px solid rgba(255,255,255,0.05);"></div>
+        <div style="position:absolute; width:1px; height:100%; background:rgba(255,255,255,0.05);"></div>
+        <div style="position:absolute; width:100%; height:1px; background:rgba(255,255,255,0.05);"></div>
+        <div style="position:absolute; width:100px; height:100px; border:1px solid rgba(255,255,255,0.05); border-radius:50%;"></div>
         <svg width="100%" height="100%" style="position:absolute; top:0; left:0;">
-            <defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="0" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#13c8ec" /></marker></defs>
-            {svg_overlay}
+            {svg}
         </svg>
-        <div style="position:absolute; bottom:10px; right:10px; color:rgba(255,255,255,0.3); font-size:10px;">MASTERMIND FIELD V2.0</div>
-    </div>
-    """
-    return components.html(html, height=620)
+        <div style="position:absolute; bottom:15px; right:15px; color:#00ff9d; font-family:monospace; font-size:12px; letter-spacing:2px; text-shadow: 0 0 5px #00ff9d;">ORACLE VISION // {title}</div>
+    </div>"""
+    return components.html(html, height=570)
 
-# --- 6. SIDEBAR: KOMUTA MERKEZİ ---
+# --- 7. SIDEBAR: KOMUTA MERKEZİ ---
 with st.sidebar:
-    st.title("🧠 DATALIG OS")
-    st.caption(f"Engine: {MODEL_ID}")
+    st.title("👁️ THE ORACLE")
+    st.caption("v.Final | Engine: Gemini 2.5 Flash")
     st.markdown("---")
 
-    # A. ODAK VE RAKİP
-    st.subheader("📍 HEDEF SEÇİMİ")
-    team_list = ["Galatasaray", "Fenerbahçe", "Beşiktaş", "Trabzonspor", "Real Madrid", "Man City", "Arsenal"]
-    f_team = st.selectbox("Takımımız", options=team_list, index=None, placeholder="Takım Seç...")
-    op_team = st.text_input("Rakip Takım", placeholder="Örn: Tottenham")
+    # A. HİBRİT TAKIM SEÇİMİ
+    st.subheader("⚔️ BİRİM KONFİGÜRASYONU")
     
-    if f_team: st.session_state.context['focus_team'] = f_team
-    if op_team: st.session_state.context['opponent'] = op_team
+    # Yönetilen Takım
+    f_select = st.selectbox("Yönetilen Birim", TURKISH_TEAMS + ["➕ MANUEL GİRİŞ"])
+    if f_select == "➕ MANUEL GİRİŞ":
+        f_team = st.text_input("Takım Adı Gir:", key="ft_input")
+    else:
+        f_team = f_select
+    st.session_state.context['focus_team'] = f_team
 
-    st.markdown("---")
+    # Rakip Takım
+    op_select = st.selectbox("Hedef Birim (Rakip)", ALL_TEAMS + ["➕ MANUEL GİRİŞ"])
+    if op_select == "➕ MANUEL GİRİŞ":
+        op_team = st.text_input("Rakip Adı Gir:", key="op_input")
+    else:
+        op_team = op_select
+    st.session_state.context['opponent'] = op_team
     
-    # B. OYUN PARAMETRELERİ
-    st.subheader("⚙️ PARAMETRELER")
-    phase = st.radio("Oyun Fazı", ["SET HÜCUMU", "SAVUNMA", "GEÇİŞ"])
+    # Durum Kontrolü
+    is_ready = (f_team not in [None, ""]) and (op_team not in [None, ""])
+    if is_ready:
+        st.success(f"ANALİZ: {f_team} vs {op_team}")
+    
+    st.markdown("---")
+
+    # B. OYUN FAZI
+    phase = st.radio("ANALİZ BOYUTU", ["HÜCUM KURGUSU", "SAVUNMA BLOĞU", "GEÇİŞ OYUNU"])
     st.session_state.context['game_phase'] = phase
+    st.markdown("---")
+
+    # C. TEMEL ANALİZ BUTONLARI
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("🧬 STRATEJİ", disabled=not is_ready, use_container_width=True):
+            with st.spinner("Oracle strateji geliştiriyor..."):
+                st.session_state.context['reports']['strategy'] = oracle_brain("STRATEGY", f"{op_team} takımına karşı {f_team} için mutlak galibiyet stratejisi.")
+    with col2:
+        if st.button("📊 VERİ HUB", disabled=not is_ready, use_container_width=True):
+            with st.spinner("Veri ağları taranıyor..."):
+                st.session_state.context['reports']['omniscient'] = oracle_brain("OMNISCIENT", f"{f_team} vs {op_team} maçı için xG, PPDA ve yorumcu analizleri.")
     
+    if st.button("🚀 PERFORMANS OPTİMİZASYONU", disabled=not f_team, use_container_width=True):
+         with st.spinner("Antrenman algoritmaları çalışıyor..."):
+             st.session_state.context['reports']['optimization'] = oracle_brain("OPTIMIZATION", f"{f_team} için {phase} kurgusunu geliştirecek antrenman setleri.")
+
+    if st.button("🧠 META-ANALİZ (Psikoloji/Hava)", disabled=not is_ready, use_container_width=True):
+        with st.spinner("Çevresel faktörler hesaplanıyor..."):
+            st.session_state.context['reports']['meta'] = oracle_brain("META", f"{f_team} ve {op_team} son durum psikolojik analizi ve maç günü hava durumu.")
+
     st.markdown("---")
     
-    # C. AKSİYON BUTONLARI (MODÜLLER)
-    st.subheader("🚀 ANALİZ MODÜLLERİ")
+    # D. OYUNCU TIMELINE (DEDEKTİF)
+    st.subheader("🕵️ ZAMAN ÇİZELGESİ")
+    target_player = st.text_input("Hedef Oyuncu", placeholder="Örn: Marco Asensio")
+    if st.button("⏱️ Kırılma Anını Bul", disabled=not target_player):
+        with st.spinner(f"{target_player} analiz ediliyor..."):
+            st.session_state.context['reports']['timeline'] = oracle_brain("TIMELINE", f"{target_player} ({op_team}) maçın hangi dakikalarında fiziksel düşüş yaşıyor?")
+
+    st.markdown("---")
+
+    # E. KRİZ YÖNETİMİ (YENİ MODÜL)
+    st.subheader("⚡ KRİZ / SENARYO SİMÜLASYONU")
+    scenario_list = ["10 Kişi Kaldık (Kırmızı Kart)", "Skor 1-0 Öndeyiz (Kapanma)", "Skor 0-1 Gerideyiz (Risk)", "Rakip 'Otobüs' Çekti"]
+    sc_select = st.selectbox("Senaryo", scenario_list + ["Manuel Senaryo"])
     
-    if st.button("🧬 RAKİP DNA (Tedesco)", disabled=not op_team):
-        with st.spinner("Zayıf halkalar taranıyor..."):
-            res = master_agent("DNA", f"{op_team} taktiksel zayıflıkları ve son maç istatistikleri.")
-            st.session_state.context['reports']['dna'] = res
-            
-    if st.button("📊 OMNISCIENT DATA (Veri+Yorum)", disabled=not op_team):
-        with st.spinner("xG, Sakatlık ve Yorumcu görüşleri harmanlanıyor..."):
-            res = master_agent("OMNISCIENT", f"{f_team} vs {op_team} maçı için xG, PPDA, sakatlıklar ve uzman taktik yorumları.")
-            st.session_state.context['reports']['omniscient'] = res
+    final_sc = sc_select
+    if sc_select == "Manuel Senaryo":
+        final_sc = st.text_input("Senaryoyu Yaz:", placeholder="Örn: 80. dakikada kalecimiz sakatlandı")
+        
+    if st.button("B PLANINI ÇALIŞTIR", disabled=not is_ready):
+        with st.spinner("Oracle kriz çözümü üretiyor..."):
+             st.session_state.context['reports']['scenario'] = oracle_brain("SCENARIO", f"{f_team} vs {op_team} maçında durum: {final_sc}. Bize kurtuluş planını ver.")
 
-    if st.button("🏋️ ANTRENMAN (Conte/SAF)", disabled=not f_team):
-        with st.spinner("Driller hazırlanıyor..."):
-            res = master_agent("DRILLS", f"{f_team} için {phase} fazına uygun antrenman planı.")
-            st.session_state.context['reports']['drills'] = res
 
-    if st.button("⛈️ PSİKOLOJİ & ATMOSFER", disabled=not op_team):
-        with st.spinner("Hoca ruh hali ve hava durumu analizi..."):
-            res = master_agent("PSYCHE", f"{f_team} ve {op_team} son basın toplantıları analizi ve maç günü hava durumu etkisi.")
-            st.session_state.context['reports']['psyche'] = res
+# --- 8. ANA EKRAN DÜZENİ ---
+main_col1, main_col2 = st.columns([5, 5])
 
-# --- 7. ANA EKRAN DÜZENİ ---
-col1, col2 = st.columns([4, 6])
-
-with col1:
-    st.subheader("📋 MASTERMIND RAPORLARI")
-    tab1, tab2, tab3, tab4 = st.tabs(["🧬 DNA", "📊 VERİ", "🏋️ ANTRENMAN", "🧠 MENTAL"])
+with main_col1:
+    st.subheader("📋 ORACLE RAPORLARI")
+    # Tüm modüller için sekmeler
+    t1, t2, t3, t4, t5, t6 = st.tabs(["🧬 STRATEJİ", "📊 VERİ", "🚀 İDMAN", "🧠 META", "🕵️ OYUNCU", "⚡ KRİZ"])
     
-    with tab1: st.info(st.session_state.context['reports']['dna'])
-    with tab2: st.success(st.session_state.context['reports']['omniscient'])
-    with tab3: st.warning(st.session_state.context['reports']['drills'])
-    with tab4: st.error(st.session_state.context['reports']['psyche'])
+    with t1: st.write(st.session_state.context['reports']['strategy'])
+    with t2: st.info(st.session_state.context['reports']['omniscient'])
+    with t3: st.success(st.session_state.context['reports']['optimization'])
+    with t4: st.warning(st.session_state.context['reports']['meta'])
+    with t5: 
+        if st.session_state.context['reports']['timeline']:
+            st.markdown(f"### 📉 {target_player} PERFORMANS EĞRİSİ")
+            st.write(st.session_state.context['reports']['timeline'])
+        else: st.write("Oyuncu analizi bekleniyor...")
+    with t6:
+        if st.session_state.context['reports']['scenario']:
+            st.error("🚨 SİMÜLASYON SONUCU")
+            st.write(st.session_state.context['reports']['scenario'])
+        else: st.write("Senaryo bekleniyor...")
 
-with col2:
-    st.subheader(f"🏟️ TAKTİK SAHA ({st.session_state.context['game_phase']})")
-    render_pitch(st.session_state.context['game_phase'], st.session_state.context['formation'])
-
-# Chat Input
-if prompt := st.chat_input("Mastermind'a özel bir soru sor..."):
-    with st.chat_message("user"): st.write(prompt)
-    with st.chat_message("assistant"):
-        ans = master_agent("GENERAL", prompt)
-        st.write(ans)
+with main_col2:
+    st.subheader(f"SAHA SİMÜLASYONU // {st.session_state.context['game_phase']}")
+    render_pitch(st.session_state.context['game_phase'])
