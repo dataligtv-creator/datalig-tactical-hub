@@ -2,137 +2,173 @@ import streamlit as st
 import streamlit.components.v1 as components
 from google import genai
 from google.genai import types
+from pinecone import Pinecone
+from langchain_community.embeddings import HuggingFaceEmbeddings
 import time
 
-# --- 1. SAYFA KONFİGÜRASYONU ---
-st.set_page_config(page_title="DATALIG Mastermind OS", page_icon="🧠", layout="wide")
+# --- 1. SİSTEM AYARLARI VE KİMLİK ---
+st.set_page_config(page_title="DATALIG MASTERMIND OS", page_icon="🧠", layout="wide")
 
-# --- 2. SESSION STATE (BELLEK) ---
-# Hataları önlemek için tüm değişkenleri burada başlatıyoruz
-if 'tactic_context' not in st.session_state:
-    st.session_state.tactic_context = {
-        "focus_team": "Seçilmedi",
+# Efsanevi Hocalar Listesi (Sistem Talimatı İçin)
+LEGENDS = "Pep Guardiola, Carlo Ancelotti, Sir Alex Ferguson, José Mourinho, Jürgen Klopp, Zinedine Zidane, Diego Simeone, Vicente del Bosque, Luis Enrique, Antonio Conte, Domenico Tedesco"
+
+# YouTube ve Medya Kaynakları
+ANALYST_CHANNELS = ["VOLE", "SportsDigitale", "Serbest Sekiz", "Erdal Vahid", "Socrates", "The Coaches Voice", "Tifo Football"]
+
+# --- 2. SESSION STATE (SİSTEM HAFIZASI) ---
+if 'context' not in st.session_state:
+    st.session_state.context = {
+        "focus_team": None,
+        "opponent": None,
         "formation": "4-3-3",
         "game_phase": "SET HÜCUMU",
-        "scouting_report": "Sistem aktif. Mastermind hazır.",
-        "dna_summary": "Analiz için takım seçin.",
-        "messages": [] 
+        "reports": {
+            "dna": "Henüz analiz yapılmadı.",
+            "drills": "Antrenman programı bekleniyor.",
+            "omniscient": "Veri merkezi beklemede.",
+            "psyche": "Mental analiz yapılmadı."
+        }
     }
 
-# --- 3. ANALİZ MOTORU (GEMINI 2.5 FLASH - GERÇEKLİK AYARLI) ---
-def get_mastermind_analysis(query, mode="TACTIC"):
-    MODEL_ID = "gemini-2.5-flash"
-    client = genai.Client(api_key=st.secrets["GOOGLE_API_KEY"])
+# --- 3. GEMINI 2.5 FLASH VE PINECONE BAŞLATMA ---
+@st.cache_resource
+def init_system():
+    try:
+        # API Keyleri st.secrets'tan çeker
+        client = genai.Client(api_key=st.secrets["GOOGLE_API_KEY"])
+        pc = Pinecone(api_key=st.secrets["PINECONE_API_KEY"])
+        idx = pc.Index("regista-arsiv") # Vektör veritabanı
+        embeds = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+        return client, idx, embeds
+    except: return None, None, None
+
+client, pinecone_index, embeddings = init_system()
+MODEL_ID = "gemini-2.5-flash" # Mühürlendi
+
+# --- 4. ZEKİ ANALİZ FONKSİYONLARI ---
+
+def master_agent(task, query):
+    """
+    Tüm modüllerin kullandığı ana beyin fonksiyonu.
+    Task'e göre persona değiştirir (Scout, Hoca, Psikolog).
+    """
     search_tool = types.Tool(google_search=types.GoogleSearch())
     
-    current_date = "2 Ocak 2026"
-    
-    # Fenerbahçe 3'lü oynamıyor uyarısını buraya mühürledik
-    fact_check = (
-        "ÖNEMLİ BİLGİ: 2026 itibarıyla Fenerbahçe ana plan olarak 4-2-3-1 oynamaktadır. "
-        "Eski 3'lü savunma verilerini hata olarak kabul et ve analizlerini güncel 4'lü savunma üzerine kur."
-    )
-    
-    if mode == "DNA":
-        sys_instruction = (
-            f"Sen Domenico Tedesco'sun. {fact_check} Rakibi deşifre et. "
-            "Yanıtının en başına '### OZET START ###' yaz ve altına rakibin en zayıf 5 noktasını madde madde ekle. "
-            "Ardından '### OZET END ###' yaz ve detaylı analize geç."
-        )
+    if task == "DNA":
+        sys_inst = f"Sen Domenico Tedesco ve Luis Enrique'sin. {st.session_state.context['focus_team']} için internetteki (WhoScored, FBref) verileri tara ve rakip zayıf halkalarını sayısal olarak deşifre et."
+    elif task == "DRILLS":
+        sys_inst = f"Sen Antonio Conte ve Sir Alex Ferguson'sun. Analiz edilen taktiği sahaya yansıtacak 3 somut antrenman drilli (Isınma, Ana Bölüm, Taktik) hazırla."
+    elif task == "OMNISCIENT":
+        sys_inst = f"Sen {LEGENDS} hibrit zekasına sahip bir Veri Bilimci'sin. xG, PPDA ve sakatlık verilerini bul ve bunları taktiksel bir dille yorumla."
+    elif task == "PSYCHE":
+        sys_inst = "Sen bir Spor Psikoloğu ve Meteoroloji Uzmanısın. Hoca basın toplantılarını, takımın stres seviyesini ve maç saati hava durumunu analiz et."
     else:
-        sys_instruction = f"Sen efsanevi hocaların hibrit zekasısın. {fact_check} Tarih: {current_date}."
+        sys_inst = f"Sen {LEGENDS} birleşimisin."
 
-    config = types.GenerateContentConfig(tools=[search_tool], system_instruction=sys_instruction)
-    response = client.models.generate_content(model=MODEL_ID, contents=[query], config=config)
-    return response.text
-
-# --- 4. 🏟️ UI MOTORU ---
-def render_dashboard(context):
-    # Değişkenlerin boş gelme ihtimaline karşı koruma
-    report = context.get('scouting_report', "").replace("\n", "<br>").replace('"', "'")
-    dna_indices = context.get('dna_summary', "").replace("\n", "<br>").replace('"', "'")
-    form = context.get('formation', "4-3-3")
-    team = context.get('focus_team', "Seçilmedi")
-
-    # Diziliş Veritabanı
-    pos_db = {
-        "4-3-3": [(93, 50, "1"), (80, 15, "3"), (82, 38, "4"), (82, 62, "5"), (80, 85, "2"), (55, 30, "8"), (60, 50, "6"), (55, 70, "10"), (30, 20, "7"), (25, 50, "9"), (30, 80, "11")],
-        "4-2-3-1": [(93, 50, "1"), (80, 15, "3"), (82, 38, "4"), (82, 62, "5"), (80, 85, "2"), (65, 40, "6"), (65, 60, "8"), (45, 20, "7"), (42, 50, "10"), (45, 80, "11"), (25, 50, "9")]
-    }
+    config = types.GenerateContentConfig(tools=[search_tool], system_instruction=sys_inst)
     
-    players_html = "".join([f"<div style='position:absolute; top:{t}%; left:{l}%; transform:translate(-50%,-50%); z-index:20;'><div style='width:22px; height:22px; border-radius:50%; background:white; border:2px solid #13c8ec; display:flex; align-items:center; justify-content:center; font-size:9px; font-weight:bold; color:black;'>{num}</div></div>" for t, l, num in pos_db.get(form, pos_db["4-3-3"])])
+    try:
+        response = client.models.generate_content(model=MODEL_ID, contents=[query], config=config)
+        return response.text
+    except Exception as e: return f"Bağlantı Hatası: {str(e)}"
 
-    html_code = f"""
-    <div style="background:#0b1011; color:white; font-family:sans-serif; padding:10px; display:grid; grid-template-columns: 1fr 2fr 1fr; gap:15px;">
-        <div style="background:#111718; border:1px solid #283639; border-radius:8px; padding:12px; height:500px; border-left:4px solid #facc15; overflow-y:auto;">
-            <h3 style="color:#facc15; font-size:10px; font-weight:bold; text-transform:uppercase;">🧬 DNA ÖZETİ (ZAYIF NOKTALAR)</h3>
-            <div style="font-size:11px; color:#fbbf24; margin-top:10px; line-height:1.6;">{dna_indices}</div>
-        </div>
-        <div style="background:#0f1516; border-radius:15px; border:1px solid #283639; position:relative; overflow:hidden; display:flex; justify-content:center; align-items:center;">
-            <div style="width:350px; height:480px; background:#173828; border:2px solid rgba(255,255,255,0.2); position:relative; border-radius:10px; background-image:repeating-linear-gradient(0deg, transparent, transparent 40px, rgba(255,255,255,0.02) 40px, rgba(255,255,255,0.02) 80px);">
-                <div style="position:absolute; inset:10px; border:1px solid rgba(255,255,255,0.2);">
-                    <div style="position:absolute; top:50%; left:0; right:0; height:1px; background:rgba(255,255,255,0.2);"></div>
-                </div>
-                {players_html}
-            </div>
-        </div>
-        <div style="background:#111718; border:1px solid #283639; border-radius:8px; padding:12px;">
-            <p style="font-size:10px; color:#94a3b8; text-transform:uppercase;">Aktif Takım</p>
-            <p style="font-size:18px; font-weight:bold;">{team}</p>
-            <p style="font-size:10px; color:#94a3b8; text-transform:uppercase; margin-top:20px;">Diziliş</p>
-            <p style="font-size:18px; font-weight:bold; color:#13c8ec;">{form}</p>
-        </div>
+# --- 5. GÖRSELLEŞTİRME VE UI (SAHA & PANELLER) ---
+
+def render_pitch(phase, formation):
+    # Dinamik oklar ve alanlar
+    svg_overlay = ""
+    if phase == "SET HÜCUMU":
+        svg_overlay = """
+        <line x1="10%" y1="50%" x2="40%" y2="20%" stroke="#13c8ec" stroke-width="2" marker-end="url(#arrow)" stroke-dasharray="5,5"/>
+        <line x1="10%" y1="50%" x2="40%" y2="80%" stroke="#13c8ec" stroke-width="2" marker-end="url(#arrow)" stroke-dasharray="5,5"/>
+        <circle cx="50%" cy="50%" r="60" fill="none" stroke="#13c8ec" stroke-opacity="0.2" stroke-width="2"/>
+        """
+    elif phase == "SAVUNMA":
+        svg_overlay = """
+        <rect x="30%" y="20%" width="40%" height="60%" fill="rgba(239,68,68,0.15)" stroke="none"/>
+        <line x1="30%" y1="20%" x2="30%" y2="80%" stroke="#ef4444" stroke-width="2"/>
+        """
+    
+    # Basit Piyon Yerleşimi (4-3-3 Örneği)
+    players_html = "" # (Buraya daha önceki detaylı piyon kodları gelir)
+
+    html = f"""
+    <div style="background:#0f1516; border:2px solid #283639; border-radius:12px; height:600px; position:relative; overflow:hidden;">
+        <svg width="100%" height="100%" style="position:absolute; top:0; left:0;">
+            <defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="0" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#13c8ec" /></marker></defs>
+            {svg_overlay}
+        </svg>
+        <div style="position:absolute; bottom:10px; right:10px; color:rgba(255,255,255,0.3); font-size:10px;">MASTERMIND FIELD V2.0</div>
     </div>
     """
-    return components.html(html_code, height=550)
+    return components.html(html, height=620)
 
-# --- 5. SIDEBAR ---
-ALL_TEAMS = ["Galatasaray", "Fenerbahçe", "Beşiktaş", "Trabzonspor", "Real Madrid", "Man City", "Arsenal", "Barcelona", "Liverpool", "Bayer Leverkusen"]
-
+# --- 6. SIDEBAR: KOMUTA MERKEZİ ---
 with st.sidebar:
-    st.title("🧠 MASTERMIND OS")
-    # Değişkeni sidebar içinde tanımlayıp anında context'e yazıyoruz
-    st.session_state.tactic_context['focus_team'] = st.selectbox(
-        "🎯 TAKIM ODAĞI", 
-        options=ALL_TEAMS, 
-        index=None, 
-        placeholder="Takım Seçiniz..."
-    ) or "Seçilmedi"
-    
-    selected_team = st.session_state.tactic_context['focus_team']
-    
-    if selected_team != "Seçilmedi":
-        if st.button("🔬 RAKİBİ DEŞİFRE ET", use_container_width=True):
-            with st.spinner("🧬 DNA Analizi yapılıyor..."):
-                full_dna = get_mastermind_analysis(f"{selected_team} takımını deşifre et.", mode="DNA")
-                
-                if "### OZET START ###" in full_dna:
-                    summary = full_dna.split("### OZET START ###")[1].split("### OZET END ###")[0]
-                    detail = full_dna.replace("### OZET START ###", "").replace("### OZET END ###", "").replace(summary, "")
-                    st.session_state.tactic_context['dna_summary'] = summary.strip()
-                    st.session_state.tactic_context['messages'].append({"role": "assistant", "content": f"🧬 **{selected_team.upper()} DNA DEŞİFRESİ:**\n\n{detail.strip()}"})
-                else:
-                    st.session_state.tactic_context['dna_summary'] = "Analiz chat ekranında."
-                    st.session_state.tactic_context['messages'].append({"role": "assistant", "content": full_dna})
-                st.rerun()
+    st.title("🧠 DATALIG OS")
+    st.caption(f"Engine: {MODEL_ID}")
+    st.markdown("---")
 
-# --- 6. RENDER & CHAT ---
-render_dashboard(st.session_state.tactic_context)
-
-st.markdown("---")
-for msg in st.session_state.tactic_context['messages'][-3:]:
-    with st.chat_message(msg["role"]): st.markdown(msg["content"])
-
-if prompt := st.chat_input("Mastermind'a direktif ver..."):
-    st.session_state.tactic_context['messages'].append({"role": "user", "content": prompt})
-    with st.chat_message("user"): st.markdown(prompt)
+    # A. ODAK VE RAKİP
+    st.subheader("📍 HEDEF SEÇİMİ")
+    team_list = ["Galatasaray", "Fenerbahçe", "Beşiktaş", "Trabzonspor", "Real Madrid", "Man City", "Arsenal"]
+    f_team = st.selectbox("Takımımız", options=team_list, index=None, placeholder="Takım Seç...")
+    op_team = st.text_input("Rakip Takım", placeholder="Örn: Tottenham")
     
+    if f_team: st.session_state.context['focus_team'] = f_team
+    if op_team: st.session_state.context['opponent'] = op_team
+
+    st.markdown("---")
+    
+    # B. OYUN PARAMETRELERİ
+    st.subheader("⚙️ PARAMETRELER")
+    phase = st.radio("Oyun Fazı", ["SET HÜCUMU", "SAVUNMA", "GEÇİŞ"])
+    st.session_state.context['game_phase'] = phase
+    
+    st.markdown("---")
+    
+    # C. AKSİYON BUTONLARI (MODÜLLER)
+    st.subheader("🚀 ANALİZ MODÜLLERİ")
+    
+    if st.button("🧬 RAKİP DNA (Tedesco)", disabled=not op_team):
+        with st.spinner("Zayıf halkalar taranıyor..."):
+            res = master_agent("DNA", f"{op_team} taktiksel zayıflıkları ve son maç istatistikleri.")
+            st.session_state.context['reports']['dna'] = res
+            
+    if st.button("📊 OMNISCIENT DATA (Veri+Yorum)", disabled=not op_team):
+        with st.spinner("xG, Sakatlık ve Yorumcu görüşleri harmanlanıyor..."):
+            res = master_agent("OMNISCIENT", f"{f_team} vs {op_team} maçı için xG, PPDA, sakatlıklar ve uzman taktik yorumları.")
+            st.session_state.context['reports']['omniscient'] = res
+
+    if st.button("🏋️ ANTRENMAN (Conte/SAF)", disabled=not f_team):
+        with st.spinner("Driller hazırlanıyor..."):
+            res = master_agent("DRILLS", f"{f_team} için {phase} fazına uygun antrenman planı.")
+            st.session_state.context['reports']['drills'] = res
+
+    if st.button("⛈️ PSİKOLOJİ & ATMOSFER", disabled=not op_team):
+        with st.spinner("Hoca ruh hali ve hava durumu analizi..."):
+            res = master_agent("PSYCHE", f"{f_team} ve {op_team} son basın toplantıları analizi ve maç günü hava durumu etkisi.")
+            st.session_state.context['reports']['psyche'] = res
+
+# --- 7. ANA EKRAN DÜZENİ ---
+col1, col2 = st.columns([4, 6])
+
+with col1:
+    st.subheader("📋 MASTERMIND RAPORLARI")
+    tab1, tab2, tab3, tab4 = st.tabs(["🧬 DNA", "📊 VERİ", "🏋️ ANTRENMAN", "🧠 MENTAL"])
+    
+    with tab1: st.info(st.session_state.context['reports']['dna'])
+    with tab2: st.success(st.session_state.context['reports']['omniscient'])
+    with tab3: st.warning(st.session_state.context['reports']['drills'])
+    with tab4: st.error(st.session_state.context['reports']['psyche'])
+
+with col2:
+    st.subheader(f"🏟️ TAKTİK SAHA ({st.session_state.context['game_phase']})")
+    render_pitch(st.session_state.context['game_phase'], st.session_state.context['formation'])
+
+# Chat Input
+if prompt := st.chat_input("Mastermind'a özel bir soru sor..."):
+    with st.chat_message("user"): st.write(prompt)
     with st.chat_message("assistant"):
-        ans = get_mastermind_analysis(prompt)
-        st.markdown(ans)
-        st.session_state.tactic_context['messages'].append({"role": "assistant", "content": ans})
-        
-        # Diziliş güncelleme mantığı
-        if "4-2-3-1" in ans: st.session_state.tactic_context['formation'] = "4-2-3-1"
-        elif "4-3-3" in ans: st.session_state.tactic_context['formation'] = "4-3-3"
-        st.rerun()
+        ans = master_agent("GENERAL", prompt)
+        st.write(ans)
