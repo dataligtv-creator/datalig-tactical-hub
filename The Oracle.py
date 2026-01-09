@@ -49,33 +49,28 @@ MODEL_ID = "gemini-3-flash-preview"
 # --- 4. ORACLE MODÜLER MOTORU (ANTİ-HALİSÜNASYON & RETRY) ---
 def oracle_engine(mode, f_team, op_team, retries=3):
     if not client: return "Bağlantı yok."
-    search_tool = types.Tool(google_search=types.GoogleSearch())
     
-    current_date = datetime.now().strftime("%d %B %Y")
-    
-    # MODÜLER TALİMATLAR (Her sekme için ayrı uzmanlık ve kesin güncellik)
-    instructions = {
-        "STRAT": f"Görevin: {f_team} vs {op_team} için ÇOK KISA strateji ver. 1. {f_team} oyun kimliği, 2. {op_team} oyun kimliği, 3. Galibiyet için kilit çözüm. Max 3 kısa paragraf.",
-        "DATA": f"Görevin: {f_team} ve {op_team} için {current_date} tarihli GÜNCEL verileri getir. xG, PPDA, sakatlıklar ve son maç sonuçlarını tablo/liste yap. Halüsinasyon görme.",
-        "KRİZ": f"Görevin: {op_team} maçında yaşanabilecek 3 somut kriz senaryosu (Örn: Torreira baskısı, Osimhen koşuları) ve her birine B planı üret.",
-        "META": f"Görevin: Maç atmosferi, taraftar etkisi ve hava durumunun taktiksel etkisini özetle.",
-        "TIMELINE": f"Görevin: {op_team} takımındaki kilit oyuncuların fiziksel/mental düşüş dakikalarını (fatigue point) analiz et.",
-        "CHAT": "Sen THE ORACLE'sın. Sorulara kısa, net ve stratejik cevaplar ver."
-    }
-
-    base = f"TARİH: {current_date}. Sen THE ORACLE'sın. Futbolun kolektif zekasısın. Kesinlikle güncel kal. İsim taklidi yapma. Yaratıcılığı kısıp (temp=0.1) gerçekliğe odaklan."
-    config = types.GenerateContentConfig(tools=[search_tool], system_instruction=f"{base}\n{instructions.get(mode, '')}")
+    # 1. Kotayı korumak için 'Thinking' modunu 'minimal' yapalım veya geçici olarak kapatalım
+    # Thinking modunu 'minimal'e çekmek token tüketimini %70 azaltır.
+    config = types.GenerateContentConfig(
+        tools=[types.Tool(google_search=types.GoogleSearch())],
+        system_instruction="Sen THE ORACLE'sın. Kısa, öz ve sadece güncel verilerle konuş.",
+        temperature=0.1,
+        # 'thinking_level'ı 'minimal' yapıyoruz
+        thinking_config={"include_thoughts": True, "thinking_level": "minimal"} 
+    )
     
     for i in range(retries):
         try:
-            query = f"{current_date} itibariyle {f_team} ve {op_team} arasındaki derin taktiksel/verisel karşılaştırmayı yap."
+            query = f"{f_team} vs {op_team} analizi."
             response = client.models.generate_content(model=MODEL_ID, contents=[query], config=config)
             return response.text
         except Exception as e:
-            if "503" in str(e) and i < retries - 1:
-                time.sleep(2)
+            if "429" in str(e):
+                # 429 hatasında 5 saniye bekle ve tekrar dene
+                time.sleep(5)
                 continue
-            return f"⚠️ Veri Senkronizasyon Hatası: {str(e)}"
+            return f"⚠️ Hata: {str(e)}"
 
 # --- 5. SAHA GÖRSELLEŞTİRME ---
 def render_pitch(phase):
