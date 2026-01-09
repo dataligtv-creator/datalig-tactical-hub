@@ -44,7 +44,7 @@ def init_client():
     return genai.Client(api_key=st.secrets["GOOGLE_API_KEY"])
 
 client = init_client()
-MODEL_ID = "gemini-3-flash"
+MODEL_ID = "gemini-3-flash-preview"
 
 # --- 4. ORACLE MODÜLER MOTORU (ANTİ-HALİSÜNASYON & RETRY) ---
 def oracle_engine(mode, f_team, op_team, retries=3):
