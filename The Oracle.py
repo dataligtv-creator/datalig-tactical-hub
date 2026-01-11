@@ -1,175 +1,136 @@
 import streamlit as st
-import streamlit.components.v1 as components
-import time
+import json
+import os
 from datetime import datetime
 
-# --- 0. BAĞLANTI VE SİSTEM AYARLARI ---
+# --- 1. SİSTEM & UI AYARLARI ---
+st.set_page_config(page_title="THE ORACLE v4", page_icon="👁️", layout="wide")
+
+# CSS: Karanlık Mode ve Modern Minimalizm (Sidebar Gizleme Dahil)
+st.markdown("""
+    <style>
+    [data-testid="stSidebar"] { display: none; }
+    .main { background-color: #050505; color: #e0e0e0; }
+    .assistant-panel {
+        background: rgba(255, 255, 255, 0.03);
+        border-radius: 15px;
+        padding: 25px;
+        border: 1px solid rgba(0, 255, 157, 0.15);
+        text-align: center;
+        transition: 0.3s;
+        margin-bottom: 20px;
+    }
+    .assistant-panel:hover { border: 1px solid #00ff9d; background: rgba(0, 255, 157, 0.05); cursor: pointer; }
+    .stChatInputContainer { padding-bottom: 50px; }
+    </style>
+    """, unsafe_allow_html=True)
+
+# --- 2. VERİ YÜKLEME (SCOUT BOT ENTEGRASYONU) ---
+def load_scout_data():
+    if os.path.exists("hub_data.json"):
+        with open("hub_data.json", "r") as f:
+            return json.load(f)
+    return {
+        "last_update": "Veri Bekleniyor...",
+        "next_match": "Samsunspor - Fenerbahçe",
+        "match_date": "11 Ocak 2026 | 21:45",
+        "weather": "12°C Yağmurlu",
+        "expert_notes": "Scout botu henüz raporu hazırlamadı."
+    }
+
+# --- 3. SESSION STATE ---
+if 'page' not in st.session_state:
+    st.session_state.page = "home"
+if 'messages' not in st.session_state:
+    st.session_state.messages = []
+
+# --- 4. ORACLE MOTORU ---
 try:
     from google import genai
     from google.genai import types
-except ImportError:
-    st.error("Kütüphane hatası: pip install google-genai streamlit")
-    st.stop()
+except:
+    st.error("Kütüphane Hatası!")
 
-st.set_page_config(page_title="THE ORACLE OS", page_icon="👁️", layout="wide")
-
-# --- 1. VERİ HAVUZU ---
-TURKISH_TEAMS = ["Fenerbahçe", "Galatasaray", "Beşiktaş", "Trabzonspor", "Başakşehir", "Samsunspor", "Eyüpspor"]
-ALL_TEAMS = sorted(list(set(TURKISH_TEAMS + ["Real Madrid", "Man City", "Liverpool", "Arsenal", "Bayern Munich", "Barcelona", "Inter"])))
-
-# --- 2. SİSTEM HAFIZASI (SESSION STATE) ---
-if 'context' not in st.session_state:
-    st.session_state.context = {
-        "focus_team": "Fenerbahçe",
-        "opponent": None,
-        "reports": {
-            "strategy": "Oracle hedef bekliyor...",
-            "data_hub": "Sayısal analiz yapılmadı.",
-            "scenarios": "Kriz varyasyonları hesaplanmadı.",
-            "meta": "Psikolojik analiz yok.",
-            "training": "İdman seti hazırlanmadı.",
-            "timeline": ""
-        }
-    }
-
-if "messages" not in st.session_state:
-    st.session_state.messages = []
-
-# --- 3. API CLIENT ---
-@st.cache_resource
-def init_client():
-    if "GOOGLE_API_KEY" not in st.secrets:
-        st.error("secrets.toml içinde API KEY eksik!")
-        return None
-    return genai.Client(api_key=st.secrets["GOOGLE_API_KEY"])
-
-client = init_client()
-MODEL_ID = "gemini-3-flash-preview"
-
-# --- 4. ORACLE MODÜLER MOTORU (ANTİ-HALİSÜNASYON & RETRY) ---
-def oracle_engine(mode, f_team, op_team, retries=3):
-    if not client: return "Bağlantı yok."
-    
-    # 1. Kotayı korumak için 'Thinking' modunu 'minimal' yapalım veya geçici olarak kapatalım
-    # Thinking modunu 'minimal'e çekmek token tüketimini %70 azaltır.
+def oracle_engine(prompt):
+    client = genai.Client(api_key=st.secrets["GOOGLE_API_KEY"])
     config = types.GenerateContentConfig(
-        tools=[types.Tool(google_search=types.GoogleSearch())],
-        system_instruction="Sen THE ORACLE'sın. Kısa, öz ve sadece güncel verilerle konuş.",
-        temperature=0.1,
-        # 'thinking_level'ı 'minimal' yapıyoruz
-        thinking_config={"include_thoughts": True, "thinking_level": "minimal"} 
+        system_instruction="Sen THE ORACLE'sın. Tedesco'nun Fenerbahçesi'nin baş taktik danışmanısın. Kısa ve stratejik konuş.",
+        temperature=0.2,
+        thinking_config={"include_thoughts": True, "thinking_level": "minimal"}
     )
+    res = client.models.generate_content(model="gemini-3-flash-preview", contents=[prompt], config=config)
+    return res.text
+
+# --- 5. UI: ÜST ASİSTAN PANELİ ---
+def render_assistant_panel(data):
+    st.markdown(f"""
+    <div class="assistant-panel">
+        <span style="color: #888; font-size: 14px; letter-spacing: 2px;">GELECEK MAÇ</span><br>
+        <b style="font-size: 24px; color: #00ff9d;">{data['next_match']}</b><br>
+        <span style="font-size: 16px; color: #bbb;">{data['match_date']} • {data['weather']}</span>
+    </div>
+    """, unsafe_allow_html=True)
     
-    for i in range(retries):
-        try:
-            query = f"{f_team} vs {op_team} analizi."
-            response = client.models.generate_content(model=MODEL_ID, contents=[query], config=config)
-            return response.text
-        except Exception as e:
-            if "429" in str(e):
-                # 429 hatasında 5 saniye bekle ve tekrar dene
-                time.sleep(5)
-                continue
-            return f"⚠️ Hata: {str(e)}"
-
-# --- 5. SAHA GÖRSELLEŞTİRME ---
-def render_pitch(phase):
-    svg = ""
-    if phase == "HÜCUM":
-        svg = """<line x1="20%" y1="50%" x2="50%" y2="20%" stroke="#00ff9d" stroke-width="2" marker-end="url(#arrow)" stroke-dasharray="4"/>"""
-    elif phase == "SAVUNMA":
-        svg = """<rect x="25%" y="25%" width="50%" height="50%" fill="rgba(255, 50, 50, 0.1)" stroke="#ff3232" stroke-width="1"/>"""
-    
-    html = f"""
-    <div style="background:#050505; border:1px solid #333; border-radius:15px; height:480px; position:relative; overflow:hidden; display:flex; justify-content:center; align-items:center;">
-        <div style="position:absolute; width:90%; height:90%; border:1px solid rgba(255,255,255,0.05);"></div>
-        <svg width="100%" height="100%" style="position:absolute; top:0; left:0;">
-            <defs><marker id="arrow" markerWidth="10" markerHeight="10" refX="0" refY="3" orient="auto"><path d="M0,0 L0,6 L9,3 z" fill="#00ff9d" /></marker></defs>
-            {svg}
-        </svg>
-        <div style="position:absolute; bottom:15px; right:15px; color:#00ff9d; font-family:monospace; font-size:12px;">ORACLE FIELD // {phase}</div>
-    </div>"""
-    return components.html(html, height=500)
-
-# --- 6. SIDEBAR VE OTOMASYON ---
-with st.sidebar:
-    st.title("👁️ THE ORACLE")
-    st.caption(f"Modular Ultimate | {datetime.now().strftime('%Y')}")
-    st.markdown("---")
-    
-    # Fenerbahçe Default Seçimi
-    f_team = st.selectbox("Yönetilen Birim", TURKISH_TEAMS, index=TURKISH_TEAMS.index("Fenerbahçe"))
-    st.session_state.context['focus_team'] = f_team
-
-    op_team = st.selectbox("Hedef Rakip", [None] + ALL_TEAMS, index=0)
-
-    # RAKİP SEÇİLDİĞİ AN OTOMATİK MODÜLER DAĞITIM
-    if op_team and op_team != st.session_state.context['opponent']:
-        st.session_state.context['opponent'] = op_team
-        with st.spinner(f"Oracle {op_team} verilerini senkronize ediyor..."):
-            st.session_state.context['reports']['strategy'] = oracle_engine("STRAT", f_team, op_team)
-            st.session_state.context['reports']['data_hub'] = oracle_engine("DATA", f_team, op_team)
-            st.session_state.context['reports']['scenarios'] = oracle_engine("KRİZ", f_team, op_team)
-            st.session_state.context['reports']['meta'] = oracle_engine("META", f_team, op_team)
+    # Görünmez buton ile tıklama hissi
+    if st.button("🏟️ SAVAŞ ODASINA (WAR ROOM) GİRİŞ YAP", use_container_width=True):
+        st.session_state.page = "war_room"
         st.rerun()
 
+# --- 6. SAYFA: HOME (CHAT MODU) ---
+def show_home():
+    data = load_scout_data()
+    render_assistant_panel(data)
+    
+    st.markdown("<br><h1 style='text-align: center; color: #333;'>👁️</h1>", unsafe_allow_html=True)
+    
+    # Chat Geçmişi
+    for msg in st.session_state.messages:
+        with st.chat_message(msg["role"]):
+            st.markdown(msg["content"])
+
+    if prompt := st.chat_input("Hocam, bugün hangi bölgeye sızalım?"):
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        with st.chat_message("user"): st.markdown(prompt)
+        
+        with st.chat_message("assistant"):
+            with st.spinner("Oracle derin analize geçiyor..."):
+                ans = oracle_engine(prompt)
+                st.markdown(ans)
+        st.session_state.messages.append({"role": "assistant", "content": ans})
+
+# --- 7. SAYFA: WAR ROOM (DERİN ANALİZ) ---
+def show_war_room():
+    data = load_scout_data()
+    
+    col_back, col_title = st.columns([1, 9])
+    with col_back:
+        if st.button("← Geri"):
+            st.session_state.page = "home"
+            st.rerun()
+    with col_title:
+        st.title(f"🏟️ WAR ROOM: {data['next_match']}")
+
     st.markdown("---")
-    phase = st.radio("Saha Fazı", ["HÜCUM", "SAVUNMA", "GEÇİŞ"])
     
+    # War Room Grid Sistemi
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        st.metric(label="Tahmini xG", value="2.10", delta="+0.45")
+        st.info(f"**Uzman Notu:** {data['expert_notes']}")
+    with c2:
+        st.metric(label="Saha Baskısı", value="%68", delta="Yüksek")
+        st.warning("**Kritik Risk:** Rakip 75+ dakikada fiziksel düşüş yaşıyor.")
+    with c3:
+        st.metric(label="Hava Etkisi", value="Sert", delta="Yağmurlu")
+        st.success("**Taktik Öneri:** Uzaktan şut denemelerini artır.")
+
     st.markdown("---")
-    st.subheader("🕵️ OYUNCU ANALİZİ")
-    target_p = st.text_input("Hedef Oyuncu", placeholder="Örn: Asensio")
-    if st.button("⏱️ Kırılma Noktasını Bul"):
-        with st.spinner("Analiz ediliyor..."):
-            st.session_state.context['reports']['timeline'] = oracle_engine("TIMELINE", f_team, target_p)
+    st.subheader("💬 Savaş Planı Sentezi")
+    # Savaş odasına özel mikro chat veya taktik tahtası buraya gelecek
+    st.caption("Burada sadece bu maça özel savaş planını konuşabilirsin...")
 
-# --- 7. ANA EKRAN (MODÜLER PANELLER) ---
-c1, c2 = st.columns([5, 5])
-
-with c1:
-    st.subheader("📋 MASTERMIND ANALİZ")
-    t1, t2, t3, t4, t5 = st.tabs(["🧬 STRATEJİ", "📊 VERİ MERKEZİ", "⚡ KRİZLER", "🧠 META", "🚀 İDMAN"])
-    
-    with t1:
-        st.markdown("### 🎯 Savaş Planı")
-        st.write(st.session_state.context['reports']['strategy'])
-    
-    with t2:
-        st.markdown("### 📈 Sayısal Veriler (GÜNCEL)")
-        st.markdown(st.session_state.context['reports']['data_hub'])
-        
-    with t3:
-        st.markdown("### 🚨 Kritik Varyasyonlar")
-        # Arka plan rengi olmadan sadece KIRMIZI metin
-        st.markdown(f'<p style="color:#ff4b4b; font-size:16px;">{st.session_state.context["reports"]["scenarios"]}</p>', unsafe_allow_html=True)
-        
-    with t4:
-        st.markdown("### 🧠 Çevresel Analiz")
-        # Arka plan rengi olmadan sadece YEŞİL metin
-        st.markdown(f'<p style="color:#00ff9d; font-size:16px;">{st.session_state.context["reports"]["meta"]}</p>', unsafe_allow_html=True)
-        
-    with t5:
-        if st.session_state.context['reports']['timeline']:
-            st.success("🕵️ Oyuncu Zaman Çizelgesi Aktif")
-            st.write(st.session_state.context['reports']['timeline'])
-        else:
-            st.success("Taktiksel antrenman programları hazırlandı.")
-
-with c2:
-    render_pitch(phase)
-
-# --- 8. CHAT ---
-st.markdown("---")
-st.subheader("💬 ORACLE İLE SENTEZ")
-for msg in st.session_state.messages:
-    with st.chat_message(msg["role"]): st.markdown(msg["content"])
-
-if prompt := st.chat_input("Oracle'a spesifik bir detay danış..."):
-    st.session_state.messages.append({"role": "user", "content": prompt})
-    with st.chat_message("user"): st.markdown(prompt)
-    
-    with st.chat_message("assistant"):
-        with st.spinner("Oracle araştırıyor..."):
-            ans = oracle_engine("CHAT", f_team, f"BAĞLAM: {f_team} vs {st.session_state.context['opponent']}. SORU: {prompt}")
-            st.markdown(ans)
-    st.session_state.messages.append({"role": "assistant", "content": ans})
+# --- 8. YÖNLENDİRME ---
+if st.session_state.page == "home":
+    show_home()
+elif st.session_state.page == "war_room":
+    show_war_room()
