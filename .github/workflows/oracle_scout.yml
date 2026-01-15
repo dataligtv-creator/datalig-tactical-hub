@@ -2,9 +2,8 @@ name: Oracle Morning Scout Task
 
 on:
   schedule:
-    # Her gün Türkiye saatiyle sabah 08:00'de çalışır (UTC 05:00)
-    - cron: '0 5 * * *'
-  workflow_dispatch: # İstediğin zaman manuel olarak GitHub üzerinden de başlatabilirsin
+    - cron: '0 5 * * *' # TR saatiyle 08:00
+  workflow_dispatch: # Manuel çalıştırma butonu ekler
 
 jobs:
   build:
