@@ -1,67 +1,67 @@
 import os
 import json
 from datetime import datetime
-import locale
 from google import genai
 from google.genai import types
 
 def run_morning_scout():
-    # API Anahtarı Kontrolü
     api_key = os.getenv("GOOGLE_API_KEY")
-    if not api_key:
-        print("HATA: GOOGLE_API_KEY bulunamadı.")
-        return
-
     client = genai.Client(api_key=api_key)
-    
-    # DİNAMİK ZAMAN: Bot her zaman 'şu an'da olduğunu bilir.
-    now = datetime.now()
-    today_str = now.strftime("%d %B %Y %H:%M")
 
-    # KESİN DOĞRULUK TALİMATI
+    # Bugünü dinamik al
+    today = datetime.now().strftime("%d %B %Y")
+
+    # SORGUNU GÜÇLENDİRDİK: Site kısıtlaması ve veri zorunluluğu ekledik
     scout_prompt = f"""
-    GÖREV: Bugün {today_str}. Google Search kullanarak Fenerbahçe'nin BU TARİHTEN SONRAKİ İLK RESMİ maçını bul.
+    Bugün {today}. 
+    Google Search kullanarak 'Fenerbahçe fikstür 2026' ve 'Fenerbahçe sıradaki maç' araması yap.
+    Mackolik, NTV Spor veya TFF sitelerindeki güncel veriyi temel al.
     
-    PRENSİP: Tahmin yürütme. Sadece TFF, UEFA veya resmi kulüp kanallarındaki veriyi kullan.
+    Aşağıdaki JSON şablonunu EKSİKSİZ doldur. 
+    Eğer maç bulamazsan 'next_match' kısmına 'Fikstür Aranıyor' yaz ama ASLA boş bırakma.
     
-    Yalnızca aşağıdaki JSON formatında yanıt ver:
     {{
         "next_match": "Ev Sahibi - Deplasman",
-        "match_date": "Gün Ay Yıl Saat",
-        "match_date_iso": "YYYY-MM-DDTHH:MM:SS",
-        "weather": "Derece ve Durum",
-        "expert_notes": "Resmi kaynaklara dayalı kısa taktik not",
-        "xg_data": {{"Ev": 0.0, "Dep": 0.0}},
-        "last_update": "{today_str}"
+        "match_date": "Gün Ay Saat",
+        "match_date_iso": "2026-MM-DDTHH:MM:SS",
+        "weather": "Tahmini Derece",
+        "expert_notes": "Maçın önemi hakkında 1 cümle",
+        "xg_data": {{"Ev": 1.5, "Dep": 1.3}},
+        "last_update": "{today}"
     }}
     """
 
-    print(f"Scout raporu hazırlanıyor... (Referans Tarih: {today_str})")
-
     try:
+        # Temperature 0.0 yaparak hayal kurmasını engelliyoruz
         response = client.models.generate_content(
             model="gemini-3-flash-preview",
             contents=[scout_prompt],
             config=types.GenerateContentConfig(
                 tools=[types.Tool(google_search=types.GoogleSearch())],
-                temperature=0.0  # Sıfır yaratıcılık, tam gerçeklik.
+                temperature=0.0 
             )
         )
 
-        # Yanıtı temizle ve JSON'a zorla
         content = response.text.strip()
+        # JSON bloğunu cımbızla çek
         start = content.find("{")
         end = content.rfind("}") + 1
-        final_data = json.loads(content[start:end])
-
-        # Dosyayı mühürle
-        with open("hub_data.json", "w", encoding="utf-8") as f:
-            json.dump(final_data, f, ensure_ascii=False, indent=4)
         
-        print(f"BAŞARILI: {final_data['next_match']} verisi mühürlendi.")
+        if start != -1:
+            final_data = json.loads(content[start:end])
+            
+            # Eğer halüsinasyon görüp şablonu doldurmadıysa hata fırlat
+            if "Ev Sahibi" in final_data["next_match"]:
+                raise ValueError("Gerçek maç verisi çekilemedi, taslak veri döndü.")
+
+            with open("hub_data.json", "w", encoding="utf-8") as f:
+                json.dump(final_data, f, ensure_ascii=False, indent=4)
+            print(f"BAŞARILI: {final_data['next_match']} kaydedildi.")
+        else:
+            print("HATA: JSON formatı bulunamadı.")
 
     except Exception as e:
-        print(f"SİSTEM HATASI: {e}")
+        print(f"KRİTİK HATA: {e}")
 
 if __name__ == "__main__":
     run_morning_scout()
