@@ -1,30 +1,42 @@
 import os
 import json
 from datetime import datetime
+import locale
 from google import genai
 from google.genai import types
 
 def run_morning_scout():
+    # API Anahtarı Kontrolü
     api_key = os.getenv("GOOGLE_API_KEY")
-    client = genai.Client(api_key=api_key)
+    if not api_key:
+        print("HATA: GOOGLE_API_KEY bulunamadı.")
+        return
 
-    # TALİMAT: Halüsinasyon yasak, sadece somut internet verisi.
-    scout_prompt = """
-    GÖREV: ŞU AN 15 OCAK 2026. Google Search kullanarak Fenerbahçe'nin sıradaki resmi maçını BUL.
-    KURAL 1: Sadece resmi fikstür bilgilerini kullan.
-    KURAL 2: Yanıtın SADECE geçerli bir JSON objesi olmalı.
-    KURAL 3: Tarihi ISO 8601 formatında (YYYY-MM-DDTHH:MM:SS) doğrula.
+    client = genai.Client(api_key=api_key)
     
-    JSON ŞABLONU:
-    {
+    # DİNAMİK ZAMAN: Bot her zaman 'şu an'da olduğunu bilir.
+    now = datetime.now()
+    today_str = now.strftime("%d %B %Y %H:%M")
+
+    # KESİN DOĞRULUK TALİMATI
+    scout_prompt = f"""
+    GÖREV: Bugün {today_str}. Google Search kullanarak Fenerbahçe'nin BU TARİHTEN SONRAKİ İLK RESMİ maçını bul.
+    
+    PRENSİP: Tahmin yürütme. Sadece TFF, UEFA veya resmi kulüp kanallarındaki veriyi kullan.
+    
+    Yalnızca aşağıdaki JSON formatında yanıt ver:
+    {{
         "next_match": "Ev Sahibi - Deplasman",
         "match_date": "Gün Ay Yıl Saat",
         "match_date_iso": "YYYY-MM-DDTHH:MM:SS",
-        "weather": "Hava Durumu",
-        "expert_notes": "Taktiksel gerçek veriye dayalı not",
-        "xg_data": {"Ev": 0.0, "Dep": 0.0}
-    }
+        "weather": "Derece ve Durum",
+        "expert_notes": "Resmi kaynaklara dayalı kısa taktik not",
+        "xg_data": {{"Ev": 0.0, "Dep": 0.0}},
+        "last_update": "{today_str}"
+    }}
     """
+
+    print(f"Scout raporu hazırlanıyor... (Referans Tarih: {today_str})")
 
     try:
         response = client.models.generate_content(
@@ -32,30 +44,24 @@ def run_morning_scout():
             contents=[scout_prompt],
             config=types.GenerateContentConfig(
                 tools=[types.Tool(google_search=types.GoogleSearch())],
-                temperature=0.0 # Yaratıcılığı sıfıra indirdik, sadece gerçeklik.
+                temperature=0.0  # Sıfır yaratıcılık, tam gerçeklik.
             )
         )
 
-        # Gelen metni temizle ve JSON'a zorla
+        # Yanıtı temizle ve JSON'a zorla
         content = response.text.strip()
         start = content.find("{")
         end = content.rfind("}") + 1
-        if start == -1 or end == 0:
-            raise ValueError("Geçerli bir JSON verisi bulunamadı.")
-            
-        final_json = json.loads(content[start:end])
-        
-        # Ekstra Güvenlik Kontrolü: Tarih alanı boş mu?
-        if final_json.get("match_date_iso") == "YYYY-MM-DDTHH:MM:SS":
-            raise ValueError("Gemini halüsinasyon denemesi yaptı, gerçek tarih çekilemedi.")
+        final_data = json.loads(content[start:end])
 
+        # Dosyayı mühürle
         with open("hub_data.json", "w", encoding="utf-8") as f:
-            json.dump(final_json, f, ensure_ascii=False, indent=4)
+            json.dump(final_data, f, ensure_ascii=False, indent=4)
         
-        print("VERİ MÜHÜRLENDİ: Kesin doğruluk sağlandı.")
+        print(f"BAŞARILI: {final_data['next_match']} verisi mühürlendi.")
 
     except Exception as e:
-        print(f"KRİTİK HATA/GÜVENLİK ENGELİ: {str(e)}")
+        print(f"SİSTEM HATASI: {e}")
 
 if __name__ == "__main__":
     run_morning_scout()
