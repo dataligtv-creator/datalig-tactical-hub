@@ -1,20 +1,36 @@
-# scout.py - Arka Plan Veri Toplayıcı
-import json
-from google import genai
-from google.genai import types
+name: Oracle Morning Scout Task
 
-def run_morning_scout():
-    client = genai.Client(api_key="API_KEY")
-    # YouTube ve Haber taraması yapıp "Futbol Bilimi" özeti çıkarır
-    scout_report = {
-        "last_update": "11 Ocak 2026 08:00",
-        "xg_data": {"Samsun": 1.45, "Fenerbahçe": 2.10},
-        "expert_notes": "Taktik Mania: Tedesco'nun baskı hattı bugün çok kritik.",
-        "weather": "12°C, Yağmurlu"
-    }
-    # Veriyi Oracle'ın okuyabileceği bir dosyaya yazar
-    with open("hub_data.json", "w") as f:
-        json.dump(scout_report, f)
+on:
+  schedule:
+    - cron: '0 5 * * *' # TR saatiyle 08:00
+  workflow_dispatch: # Manuel çalıştırma butonu ekler
 
-if __name__ == "__main__":
-    run_morning_scout()
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Kodu Çek
+        uses: actions/checkout@v3
+
+      - name: Python Kur
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Kütüphaneleri Yükle
+        run: |
+          python -m pip install --upgrade pip
+          pip install google-genai
+
+      - name: Scout'u Çalıştır
+        env:
+          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
+        run: python scout.py
+
+      - name: Verileri Güncelle ve GitHub'a Yükle
+        run: |
+          git config --global user.name 'Oracle-Bot'
+          git config --global user.email 'bot@theoracle.ai'
+          git add hub_data.json
+          git commit -m "Scout: Günlük Taktik Veri Güncellemesi [$(date)]" || echo "Değişiklik yok"
+          git push
