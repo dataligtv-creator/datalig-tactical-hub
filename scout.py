@@ -5,68 +5,71 @@ from google import genai
 from google.genai import types
 
 def run_morning_scout():
-    # 1. GitHub Secrets üzerinden API Key kontrolü
     api_key = os.getenv("GOOGLE_API_KEY")
-    
     if not api_key:
-        print("CRITICAL ERROR: GOOGLE_API_KEY is not set in environment variables.")
+        print("CRITICAL ERROR: GOOGLE_API_KEY is not set.")
         return
 
     client = genai.Client(api_key=api_key)
     model_id = "gemini-3-flash-preview"
 
-    # 2. Oracle Scout Sorgusu (2026 Gerçekliği)
-    # Bu sorgu Google Search tool'u kullanarak en taze bilgiyi çeker
+    # 1. STRATEJİK SORGU: SADECE GELECEK MAÇ VE ANALİTİK VERİ
     scout_prompt = """
-    Bugün 15 Ocak 2026. Fenerbahçe'nin (Teknik Direktör: Domenico Tedesco) bir sonraki maçını araştır.
-    Aşağıdaki bilgileri JSON formatında getir:
-    1. next_match: (Rakip Takım ismi)
-    2. match_date: (Maç tarihi ve saati)
-    3. weather: (Maçın oynanacağı şehirdeki tahmini hava durumu)
-    4. expert_notes: (Süper Lig analistlerinin ve Taktik Mania gibi kaynakların bu maç hakkındaki 1 cümlelik kritik uyarısı)
-    5. xg_data: (Takımların son maçlardaki xG ortalamaları)
+    Bugün 15 Ocak 2026. Fenerbahçe'nin (Tedesco dönemi) sıradaki resmi maçını bul.
+    SADECE aşağıdaki JSON formatında, hiçbir ek açıklama yapmadan yanıt ver:
+    {
+        "next_match": "Ev Sahibi - Deplasman",
+        "match_date": "Gün Ay Yıl Saat",
+        "match_date_iso": "YYYY-MM-DDTHH:MM:SS",
+        "weather": "Derece ve Hava Durumu",
+        "expert_notes": "Taktik Mania veya benzeri kaynaklardan 1 cümlelik analiz",
+        "xg_data": {"Ev": 1.5, "Dep": 1.2}
+    }
     """
 
-    print("Scout bot is searching for global and local tactical data...")
+    print("Scout is analyzing fixtures...")
 
     try:
-        # Google Search Tool'u aktif ederek sorgu atıyoruz
         response = client.models.generate_content(
             model=model_id,
             contents=[scout_prompt],
             config=types.GenerateContentConfig(
                 tools=[types.Tool(google_search=types.GoogleSearch())],
-                temperature=0.2
+                temperature=0.1
             )
         )
 
-        # Gelen yanıtın içinden JSON verisini ayıklama (Basit temizlik)
+        # JSON temizleme
         raw_text = response.text
-        # Markdown kod bloklarını temizle
         clean_json = raw_text.replace("```json", "").replace("```", "").strip()
-        
-        # 3. Veriyi Doğrula ve JSON'a Çevir
         final_data = json.loads(clean_json)
+        
+        # Güncelleme zamanını mühürle
         final_data["last_update"] = datetime.now().strftime("%d %B %Y %H:%M")
 
-        # 4. Hub Dosyasını Güncelle
+        # 2. DOSYAYA MÜHÜRLE (Cache)
         with open("hub_data.json", "w", encoding="utf-8") as f:
             json.dump(final_data, f, ensure_ascii=False, indent=4)
         
-        print(f"SUCCESS: hub_data.json updated for {final_data['next_match']}.")
+        print(f"SUCCESS: {final_data['next_match']} verileri mühürlendi.")
 
     except Exception as e:
         print(f"SCOUT ERROR: {str(e)}")
-        # Hata durumunda sistemin çökmemesi için yedek bir dosya oluşturabiliriz
-        fallback = {
-            "last_update": datetime.now().strftime("%d %B %Y %H:%M"),
-            "next_match": "Veri Çekilemedi",
-            "match_date": "N/A",
-            "weather": "N/A",
-            "expert_notes": f"Hata oluştu: {str(e)}"
-        }
-        with open("hub_data.json", "w", encoding="utf-8") as f:
-            json.dump(fallback, f, ensure_ascii=False, indent=4)
 
 if __name__ == "__main__":
+    # Önce mevcut dosyayı kontrol et
+    if os.path.exists("hub_data.json"):
+        with open("hub_data.json", "r") as f:
+            current_data = json.load(f)
+        
+        # Maç tarihi kontrolü (ISO Formatı sayesinde kolay karşılaştırma)
+        try:
+            match_time = datetime.fromisoformat(current_data.get("match_date_iso"))
+            if datetime.now() < match_time:
+                print("Oracle Bildirisi: Mevcut maç henüz oynanmadı. Veri çekme işlemi pas geçildi.")
+                # Sadece hava durumunu tazelemek istersen buraya bir fonksiyon ekleyebiliriz.
+                exit() # İşlemi durdur, kota harcama
+        except:
+            pass # Eğer tarih formatı bozuksa yeniden çek
+
     run_morning_scout()
