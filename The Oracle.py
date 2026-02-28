@@ -6,86 +6,72 @@ from google import genai
 from google.genai import types
 
 # --- 1. SİSTEM & UI AYARLARI ---
-st.set_page_config(page_title="THE ORACLE OS v5", page_icon="👁️", layout="wide")
+st.set_page_config(page_title="THE ORACLE OS v5.1", page_icon="👁️", layout="wide")
 
-# CSS: Oracle "Karanlık Tema" ve Profesyonel Panel
+# CSS: Karanlık Mod ve Sidebar'ı Tekrar Açan Düzenleme
 st.markdown("""
     <style>
-    [data-testid="stSidebar"] { display: none; }
+    /* Sidebar'ı görünür yapıyoruz */
+    section[data-testid="stSidebar"] { display: block !important; background-color: #0a0a0a; }
     .main { background-color: #050505; color: #e0e0e0; }
     .assistant-panel {
-        background: linear-gradient(145deg, rgba(10,10,10,1) 0%, rgba(30,30,30,1) 100%);
+        background: rgba(255, 255, 255, 0.03);
         border-radius: 15px;
-        padding: 25px;
-        border: 1px solid rgba(0, 255, 157, 0.3);
+        padding: 20px;
+        border: 1px solid rgba(0, 255, 157, 0.2);
         text-align: center;
         margin-bottom: 20px;
-        box-shadow: 0 4px 15px rgba(0, 255, 157, 0.1);
     }
-    .stChatInputContainer { padding-bottom: 50px; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. HİBRİT VERİ YÜKLEME (JSON & VALIDATION) ---
+# --- 2. HİBRİT VERİ YÜKLEME (GÜNCEL SCOUT ŞEMASIYLA UYUMLU) ---
 def load_oracle_memory():
     if os.path.exists("hub_data.json"):
         try:
             with open("hub_data.json", "r", encoding="utf-8") as f:
                 data = json.load(f)
                 
-                # Modelin "Gerçeklik Çapası" (Context Injection)
+                # Scout DNA'dan gelen yeni şemayı parse ediyoruz
+                next_battle = data.get("next_battle", {})
+                squad = data.get("active_squad", {})
+                
                 memory_context = f"""
-                [GÜNCEL DURUM RAPORU - {data.get('last_sync', 'N/A')}]
-                Fikstür: {data.get('next_battle', {}).get('match', 'Bilinmiyor')}
-                Tarih/Hava: {data.get('next_battle', {}).get('kick_off', 'N/A')} | {data.get('next_battle', {}).get('weather', 'N/A')}
+                [GERÇEKLİK VERİSİ - {data.get('last_sync', 'N/A')}]
+                Maç: {next_battle.get('match', 'Bilinmiyor')}
+                Tarih/Hava: {next_battle.get('kick_off', 'N/A')} | {next_battle.get('weather', 'N/A')}
                 
-                KADRO DURUMU:
-                - Gidenler/Yoklar: {', '.join(data.get('active_squad', {}).get('out_of_squad', []))}
-                - Yeni Eklenenler: {', '.join(data.get('active_squad', {}).get('key_additions', []))}
-                - Kritik Eksikler: {data.get('active_squad', {}).get('squad_depth_report', 'N/A')}
-                
-                FORM GRAFİĞİ:
-                {data.get('recent_form', [])}
+                KADRO ANALİZİ:
+                - Eksikler/Ayrılanlar: {', '.join(squad.get('out_of_squad', []))}
+                - Yeni Katılanlar: {', '.join(squad.get('key_additions', []))}
+                - Rapor: {squad.get('squad_depth_report', 'N/A')}
                 """
                 return data, memory_context
         except Exception as e:
-            st.error(f"Bellek okuma hatası: {e}")
+            st.error(f"Veri okuma hatası: {e}")
     
-    return {}, "Canlı veri bulunamadı. Genel futbol bilgini kullan."
+    return {}, "Veri bulunamadı. Lütfen scout.py'yi çalıştır."
 
 # --- 3. ORACLE 3.1 PRO MOTORU ---
 def oracle_engine(prompt, memory_context):
     if "GOOGLE_API_KEY" not in st.secrets:
-        return "⚠️ Hata: API anahtarı eksik."
+        return "⚠️ Hata: API anahtarı bulunamadı."
     
     client = genai.Client(api_key=st.secrets["GOOGLE_API_KEY"])
     
-    # Bugünün tam tarihi
-    current_date = datetime.now().strftime('%d %B %Y')
-    
-    # SISTEM TALİMATI: 3.1 Pro için Oracle Kişiliği
     system_instr = f"""
-    Sen THE ORACLE v5.0 (3.1 Pro) elit futbol stratejistisin. 
-    Bugün {current_date}. 28 Şubat 2026 gerçekliğinde yaşıyorsun.
-
-    GÖREVİN:
-    1. Aşağıdaki [GERÇEKLİK VERİSİ]'ni hafızandaki her şeyin üstünde tut.
-    2. Eğer bir oyuncu 'out_of_squad' listesindeyse, o artık yoktur. Asla 'Fenerbahçe'de oynuyor' deme.
-    3. Taktiksel analizlerinde Tedesco'nun modern asimetrik futbol felsefesini benimse.
-    4. Cevapların kısa, vurucu ve stratejik olsun.
-
-    [GERÇEKLİK VERİSİ]:
-    {memory_context}
+    Sen THE ORACLE v5.1 (3.1 Pro) stratejistisin. Bugün {datetime.now().strftime('%d %B %Y')}.
+    Hafızandaki eski verileri unut. Sadece sana sunulan JSON verisine sadık kal.
+    Taktiksel, ciddi ve 'Thought Partner' tonunda konuş.
+    
+    VERİ: {memory_context}
     """
     
-    # Kota dostu çapraz sorgu ihtiyacı tespiti
-    needs_web = any(word in prompt.lower() for word in ["sakat", "transfer", "son dakika", "kim geldi"])
-    
+    # Not: Studio'da 3.1 Pro erişimin yoksa "gemini-2.0-flash" kullanabilirsin.
     config = types.GenerateContentConfig(
         system_instruction=system_instr,
-        tools=[types.Tool(google_search=types.GoogleSearch())] if needs_web else [],
-        temperature=0.3, # Taktiksel yaratıcılık ve tutarlılık dengesi
-        model="gemini-3.1-pro" # Ana işlemci 3.1 Pro
+        temperature=0.2,
+        model="gemini-3.1-pro" 
     )
     
     try:
@@ -94,22 +80,31 @@ def oracle_engine(prompt, memory_context):
     except Exception as e:
         return f"Oracle Zihin Hatası: {str(e)}"
 
-# --- 4. UI: HOME ---
+# --- 4. ANA SAYFA DASHBOARD ---
 def show_home():
-    # Veri Yükleme
     hub_data, memory_context = load_oracle_memory()
     
-    # DashBoard (Görsel Paneli)
-    match = hub_data.get('next_battle', {}).get('match', 'Veri Bekleniyor')
-    kick_off = hub_data.get('next_battle', {}).get('kick_off', 'N/A')
-    
+    # Üst Panel: Gelecek Maç Bilgisi
+    next_battle = hub_data.get('next_battle', {})
     st.markdown(f"""
     <div class="assistant-panel">
-        <span style="color: #00ff9d; font-size: 12px; letter-spacing: 3px;">ORACLE TACTICAL HUB v5</span><br>
-        <b style="font-size: 32px;">{match}</b><br>
-        <span style="color: #888;">{kick_off} | {hub_data.get('next_battle', {}).get('weather', '')}</span>
+        <span style="color: #888; font-size: 12px; letter-spacing: 2px;">GELECEK MAÇ ANALİZİ</span><br>
+        <b style="font-size: 28px; color: #00ff9d;">{next_battle.get('match', 'Veri Çekiliyor...')}</b><br>
+        <span style="font-size: 16px; color: #bbb;">{next_battle.get('kick_off', 'N/A')} • {next_battle.get('weather', 'N/A')}</span>
     </div>
     """, unsafe_allow_html=True)
+
+    # Orta Panel: Modül Kısayolları (Görünürlük için Button Grubu)
+    st.write("### 🛠️ Stratejik Modüller")
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        if st.button("🧬 Scout DNA", use_container_width=True): st.info("Yan menüden 'Scout DNA' sayfasına geçiniz.")
+    with c2:
+        if st.button("📊 Match Center", use_container_width=True): st.info("Yan menüden 'Match Center' sayfasına geçiniz.")
+    with c3:
+        if st.button("📋 Taktik Tahta", use_container_width=True): st.info("Yan menüden 'Taktik Tahta' sayfasına geçiniz.")
+
+    st.markdown("---")
 
     # Chat Sistemi
     if 'messages' not in st.session_state: st.session_state.messages = []
@@ -118,19 +113,15 @@ def show_home():
         with st.chat_message(msg["role"]):
             st.markdown(msg["content"])
 
-    if prompt := st.chat_input("Hocam, taktiksel raporu hazırla..."):
+    if prompt := st.chat_input("Hocam, taktiksel bir soru sor..."):
         st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("user"): st.markdown(prompt)
         
         with st.chat_message("assistant"):
-            with st.spinner("Oracle 3.1 Pro verileri sentezliyor..."):
+            with st.spinner("Oracle 3.1 Pro analiz ediyor..."):
                 ans = oracle_engine(prompt, memory_context)
                 st.markdown(ans)
         st.session_state.messages.append({"role": "assistant", "content": ans})
 
-# --- 5. ROUTING ---
-if 'page' not in st.session_state:
-    st.session_state.page = "home"
-
-if st.session_state.page == "home":
-    show_home()
+# --- 5. ÇALIŞTIR ---
+show_home()
